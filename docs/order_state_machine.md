@@ -8,12 +8,12 @@ Replace semantics: **FIX style**. A replace ends the old order in `Replaced`
 | State | Meaning | Final? | In the book? |
 |---|---|---|---|
 | *(none)* | No order with this ID exists yet | — | no |
-| New | Accepted, nothing filled yet | | |
-| PartiallyFilled | Some filled, some still open | | |
-| Filled | Fully filled | | |
-| Cancelled | Cancelled by the client, or the leftover part of a market order | | |
-| Rejected | Failed validation, so it never existed in the book | | |
-| Replaced | Taken over by a replacement order | | |
+| New | Accepted, nothing filled yet |no |yes |
+| PartiallyFilled | Some filled, some still open |no | yes|
+| Filled | Fully filled |yes |no |
+| Cancelled | Cancelled by the client, or the leftover part of a market order |yes |no |
+| Rejected | Failed validation, so it never existed in the book |yes |no|
+| Replaced | Taken over by a replacement order |yes |no |
 
 ## Events
 
@@ -36,12 +36,12 @@ How to write each cell:
 | State \ Event | NewOrder | Cancel | Replace | PartialFill | FullFill | MarketNoLiquidity |
 |---|---|---|---|---|---|---|
 | *(none)* |→ New / accepted report, or → Rejected / reject report (validation reason) |REJECT / unknown order |REJECT / unknown order|BUG |BUG |BUG |
-| New | | | | | | |
-| PartiallyFilled | | | | | | |
-| Filled | | | | | | |
-| Cancelled | | | | | | |
-| Rejected | | | | | | |
-| Replaced | | | | | | |
+| New | REJECT / duplicate order ID | → Cancelled / order cancelled | → Replaced / order replaced and → New / order replaced | → PartiallyFilled / order partially filled | → Filled / order filled | → Cancelled / no liquidity |
+| PartiallyFilled | REJECT / duplicate order ID | → Cancelled / order cancelled | → Replaced / order replaced and → PartiallyFilled / order replaced | → PartiallyFilled / order partially filled | → Filled / order filled | → Cancelled / no liquidity |
+| Filled | REJECT / duplicate order ID | REJECT / too late, already filled | REJECT / too late, already filled | BUG | BUG | BUG |
+| Cancelled | REJECT / duplicate order ID | REJECT / already cancelled | REJECT / already cancelled | BUG | BUG | BUG |
+| Rejected | REJECT / duplicate order ID | REJECT / already rejected | REJECT / already rejected | BUG | BUG | BUG |
+| Replaced | REJECT / duplicate order ID | REJECT / too late, already replaced | REJECT / too late, already replaced | BUG | BUG | BUG |
 
 ## Decisions
 
