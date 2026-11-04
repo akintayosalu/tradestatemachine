@@ -43,19 +43,44 @@ How to write each cell:
 | Rejected | | | | | | |
 | Replaced | | | | | | |
 
-## Questions to answer before filling the table
+## Decisions
 
-1. **NewOrder on an existing ID:** is a duplicate client order ID a REJECT, or is it impossible at this layer?
-2. **Validation:** list what makes a NewOrder REJECT (zero or negative quantity, bad price, unknown instrument, ...).
-3. **Market orders:** if nothing fills at all, is the result Cancelled or Rejected?
+1. **NewOrder with an ID that already exists:** REJECT, "duplicate order ID".
+   Clients pick IDs (FIX style), so duplicates really happen, often as retries.
+   In Project 2 this changes to "return the original reply" (idempotency).
+
+2. **Validation.** A NewOrder is REJECTED if any of these are true:
+   - quantity is 0 or less, or above the maximum order size
+   - limit order has no price, or a price of 0 or less
+   - price isn't a multiple of the tick size
+   - market order includes a price
+   - side isn't buy or sell
+   - unknown instrument
+   - unsupported order type
+
+   Each check is its own reject reason. A Replace's new price and quantity go through the same checks.
+
+3. **Market order where nothing fills:** Cancelled, with the reason "no liquidity".
+   The order was valid, so it was accepted. Rejected is only for orders that fail validation.
+
 4. **The replacement order:**
-   - What state does it start in? (Think about an order that was PartiallyFilled before the replace.)
-   - Which quantities carry over from the old order (filled, remaining)?
-   - Does it keep the old order's time priority, or get a new sequence number? Under what conditions?
-   - Can it match immediately if its new price crosses the book?
-5. **Replace to a quantity at or below what's already filled:** REJECT, or treat it as a cancel?
-6. **Replace or Cancel on a final state:** what reject type does the client get, and does the reply say *why* (e.g. "already filled")?
-7. **IDs:** in FIX the replace request carries a new client order ID plus the original one. What does your engine use to find the order, and what goes on the reports?
+   - **Starting state:** the same as the old order's: PartiallyFilled if the old order had fills, otherwise New.
+   - **Quantities:** the filled quantity carries over. The new original quantity is what the client asked for, and remaining = new quantity − filled.
+   - **Time priority:** it keeps the old sequence number only if the price is unchanged and the quantity went down. Otherwise it gets a new sequence number (back of the queue).
+   - **Matching right away:** if the new price crosses the book, it's treated like a freshly arrived order and matched.
+
+5. **Replace to a quantity at or below what's already filled:** REJECT. A client who wants out sends a Cancel.
+
+6. **Cancel or Replace on a final state:** REJECT, and the reject report says why:
+   "too late, already filled", "already cancelled", "already replaced", or "unknown order".
+
+7. **IDs:**
+   - Each order gets an internal ID created by the engine, used for lookups and in the book.
+   - The engine keeps a lookup from client ID → internal ID.
+   - A Replace request carries the original client ID (used to find the order) and a new client ID (for the replacement).
+   - On replace, the old client ID stops pointing to a live order, and the replacement records which order it replaced.
+   - Reports include both client IDs.
+   - A Cancel or Replace that uses an already-replaced client ID → REJECT, "too late, already replaced".
 
 ## Invariants (to turn into tests)
 
