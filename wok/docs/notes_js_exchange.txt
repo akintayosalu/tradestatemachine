@@ -1,0 +1,4 @@
+Main Types of orders in Limit Order Book:
+1. BUY
+2. SELL
+3. CANCEL

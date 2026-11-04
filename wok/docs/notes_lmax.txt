@@ -1,0 +1,39 @@
+notes from https://martinfowler.com/articles/lmax.html
+
+- Input messages need to be taken off a network gateway and unmarshaled, replicated and journaled.
+- Output messages need to be marshaled for the network. 
+
+- The Business Logic Processor takes input messages sequentially (in the form of a method invocation), runs business logic on it, and emits output events.
+- It operates entirely in-memory, there is no database or other persistent store. Keeping all data in-memory has two important benefits. 
+    1. Firstly it's fast - there's no database to provide slow IO to access, nor is there any transactional behavior to execute since all the processing is done sequentially. 
+    2. The second advantage is that it simplifies programming - there's no object/relational mapping to do. 
+
+The heart of dealing with this is Event Sourcing,
+which means that the current state of the Business Logic Processor is entirely derivable 
+by processing the input events. As long as the input event stream is kept in a durable store, 
+you can always recreate the current state of the business logic engine by replaying the events.
+
+So, in theory, you can always rebuild the state of the Business Logic Processor by reprocessing all the events. 
+In practice, however, that would take too long should you need to spin one up. 
+So, just as with version control systems, LMAX can make snapshots of the Business Logic Processor state and restore from the snapshots. 
+They take a snapshot every night during periods of low activity. 
+Restarting the Business Logic Processor is fast, a full restart - including restarting the JVM, loading a recent snapshot, 
+and replaying a days worth of journals - takes less than a minute.
+
+Snapshots make starting up a new Business Logic Processor faster, but not quickly enough should a Business Logic Processor crash at 2pm. 
+As a result LMAX keeps multiple Business Logic Processors running all the time. 
+Each input event is processed by multiple processors, but all but one processor has its output ignored. 
+Should the live processor fail, the system switches to another one. This ability to handle fail-over is another benefit of using Event Sourcing.
+
+If some unexpected behavior occurs, the team copies the sequence of events to their development environment and replays them there. This allows them to examine what happened much more easily than is possible in most environments.
+
+Placing an order in an exchange involves:
+1.checking the target market is open to take orders
+2.checking the order is valid for that market
+3.choosing the right matching policy for the type of order
+4.sequencing the order so that each order is matched at the best possible price and matched with the right liquidity
+5.creating and publicizing the trades made as a consequence of the match
+6.updating prices based on the new trades
+
+Working in this kind of event-driven, asynchronous style, is somewhat unusual. 
+Athough using asynchrony to improve the responsiveness of an application is a familiar technique. 
