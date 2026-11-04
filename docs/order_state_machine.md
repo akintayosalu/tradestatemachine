@@ -35,7 +35,7 @@ How to write each cell:
 
 | State \ Event | NewOrder | Cancel | Replace | PartialFill | FullFill | MarketNoLiquidity |
 |---|---|---|---|---|---|---|
-| *(none)* | | | | | | |
+| *(none)* |→ New / accepted report, or → Rejected / reject report (validation reason) |REJECT / unknown order |REJECT / unknown order|BUG |BUG |BUG |
 | New | | | | | | |
 | PartiallyFilled | | | | | | |
 | Filled | | | | | | |
