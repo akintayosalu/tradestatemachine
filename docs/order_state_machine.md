@@ -84,8 +84,8 @@ How to write each cell:
 
 ## Invariants (to turn into tests)
 
-- filled + remaining = original quantity
-- remaining is 0 exactly when the order is Filled, and is set to 0 on any final state
+- live orders (New, PartiallyFilled): filled + remaining = original quantity
+- final orders (Filled, Cancelled, Rejected, Replaced): remaining = 0; a Filled order also has filled = original
 - an order is in the book if and only if it's New or PartiallyFilled
 - filled quantity never goes down
 - every order ends in exactly one final state
