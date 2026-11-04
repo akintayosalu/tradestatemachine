@@ -36,8 +36,8 @@ How to write each cell:
 | State \ Event | NewOrder | Cancel | Replace | PartialFill | FullFill | MarketNoLiquidity |
 |---|---|---|---|---|---|---|
 | *(none)* |→ New / accepted report, or → Rejected / reject report (validation reason) |REJECT / unknown order |REJECT / unknown order|BUG |BUG |BUG |
-| New | REJECT / duplicate order ID | → Cancelled / order cancelled | → Replaced / order replaced and → New / order replaced, or REJECT / invalid replace (order unchanged) | → PartiallyFilled / order partially filled | → Filled / order filled | → Cancelled / no liquidity |
-| PartiallyFilled | REJECT / duplicate order ID | → Cancelled / order cancelled | → Replaced / order replaced and → PartiallyFilled / order replaced, or REJECT / invalid replace (order unchanged) | → PartiallyFilled / order partially filled | → Filled / order filled | → Cancelled / no liquidity |
+| New | REJECT / duplicate order ID | → Cancelled / order cancelled | → Replaced / order replaced and → New / order replaced, or REJECT / invalid replace (order unchanged) | → PartiallyFilled / order partially filled | → Filled / order filled | → Cancelled / no liquidity (market order); BUG (limit order) |
+| PartiallyFilled | REJECT / duplicate order ID | → Cancelled / order cancelled | → Replaced / order replaced and → PartiallyFilled / order replaced, or REJECT / invalid replace (order unchanged) | → PartiallyFilled / order partially filled | → Filled / order filled | → Cancelled / no liquidity (market order); BUG (limit order) |
 | Filled | REJECT / duplicate order ID | REJECT / too late, already filled | REJECT / too late, already filled | BUG | BUG | BUG |
 | Cancelled | REJECT / duplicate order ID | REJECT / already cancelled | REJECT / already cancelled | BUG | BUG | BUG |
 | Rejected | REJECT / duplicate order ID | REJECT / already rejected | REJECT / already rejected | BUG | BUG | BUG |
