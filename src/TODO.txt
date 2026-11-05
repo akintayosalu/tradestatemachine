@@ -1,0 +1,96 @@
+PROJECT 1, STEP 1: ORDER + STATE MACHINE
+========================================
+Guidance only. Tick things off as you go. Reference: docs/order_state_machine.md
+(the matrix) and docs/design.md (rules + invariants).
+
+
+0. FIX-UPS TO WHAT YOU HAVE (src/engine/statemachine.cpp)
+---------------------------------------------------------
+[ ] Remove main() from this file. Only src/main.cpp may have main(). Any other
+    main() in src/ clashes with it (and with the test runner) at link time.
+    Scratch experiments with their own main() go in wok/.
+[ ] Split declarations from logic:
+      include/engine/<name>.hpp : enums, the Order type, function declarations
+      src/engine/<name>.cpp     : function bodies
+    Tests can only use what's in a header.
+[ ] Include <cstdint> wherever you use uint64_t (it works now only by luck).
+[ ] Price: don't use double. Store price as an integer number of ticks
+    (e.g. cents). Doubles make "same price level?" and "price unchanged on
+    replace?" comparisons unreliable, and they hurt byte-identical output.
+[ ] Your OrderType {Buy, Sell} is really the *side*. You also need the order
+    *type*: Limit vs Market. The matrix depends on it (MarketNoLiquidity is a
+    Cancel for market orders and a BUG for limit orders).
+    Decide what a market order's price field means (unused / ignored).
+[ ] Give the enums an operator<< that prints names, not numbers. Tests and
+    logs become readable ("PartiallyFilled", not "1").
+[ ] Stray ';' after the closing brace of main(). Harmless, but remove it.
+
+
+1. THE ORDER RECORD: fields to think about
+-------------------------------------------
+[ ] Internal order ID (engine-assigned) vs client ID (ClOrdID). Replace needs
+    both, plus a link from the replacement back to the old order (OrigClOrdID).
+[ ] Side, order type, price (ticks), original / filled / remaining qty, state.
+[ ] Sequence number (assigned by the engine on accept/replace) for time
+    priority. Never wall-clock time.
+[ ] Decide: is remaining stored, or computed as original - filled? Storing
+    both means an invariant to keep true; computing it means one can't drift.
+[ ] Decide: who is allowed to change state? Ideally only the transition
+    function, so nothing can skip the matrix.
+
+
+2. THE TRANSITION FUNCTION (the core of this step)
+--------------------------------------------------
+[ ] Input: current state (including "no such order" for the (none) row),
+    the event, and whatever event data it needs (fill qty, order type, ...).
+[ ] Output has three possible kinds, matching the matrix:
+      ACCEPT -> new state (+ what report to emit)
+      REJECT -> state unchanged + a reason (unknown order, duplicate id,
+                too late filled/cancelled/rejected/replaced, invalid replace)
+      BUG    -> engine produced an impossible event; fail loudly
+    Decide how you represent these three (it's your design).
+[ ] Represent reject reasons as a fixed set of values, not free text, so
+    tests can compare them exactly.
+[ ] Decide how BUG behaves: assert/abort, or a distinct result the caller
+    must handle. Rule from design.md: client events are NEVER a BUG.
+[ ] Fills: PartialFill vs FullFill must agree with quantities (a "partial"
+    fill that zeroes remaining is a bug). Decide where that is checked.
+[ ] Keep it pure: no printing, no globals, no book access. Same inputs ->
+    same outputs. That's what makes it testable and deterministic.
+
+
+3. APPLYING A TRANSITION TO AN ORDER
+------------------------------------
+[ ] On ACCEPT: update state and quantities together, so invariants hold
+    after every single step.
+[ ] On REJECT: change nothing on the order.
+[ ] Replace (FIX style): old order -> Replaced (remaining 0); a NEW order record
+    is created carrying the old filled qty and starting in the old state
+    (New or PartiallyFilled). Priority kept only if price unchanged AND qty
+    decreased, otherwise new sequence number. Invalid replace (e.g. new qty
+    <= already filled) -> REJECT, old order untouched.
+
+
+4. TESTS (tests/, one file for the state machine is fine)
+---------------------------------------------------------
+[ ] One TEST_CASE per matrix cell: 7 rows x 6 events = 42. Name them so
+    FILTER works, e.g. "state: New x Cancel -> Cancelled".
+[ ] For REJECT cells, check the reason AND that the order is unchanged.
+[ ] For BUG cells, check you get your BUG outcome (if BUG aborts, test it
+    differently or make BUG a returnable result).
+[ ] Invariant checks after every transition in a test:
+      live (New, PartiallyFilled): filled + remaining == original
+      final: remaining == 0; Filled also has filled == original
+      filled never decreases
+[ ] A few multi-step scenarios from docs/order_state_machine_explained.md
+    (e.g. market order: New -> PartiallyFilled -> Cancelled on no liquidity;
+    replace after a partial fill).
+[ ] Run: make test, then make test-asan.
+
+
+5. NOT YET (later steps, don't start these now)
+-----------------------------------------------
+- Order book (price levels, FIFO per level)
+- Matching loop (turns incoming orders into fill events)
+- Execution reports / output log
+- Determinism test, benchmarks, ITCH replay
