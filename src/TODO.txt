@@ -21,7 +21,7 @@ Guidance only. Tick things off as you go. Reference: docs/order_state_machine.md
     *type*: Limit vs Market. The matrix depends on it (MarketNoLiquidity is a
     Cancel for market orders and a BUG for limit orders).
     Decide what a market order's price field means (unused / ignored).
-[ ] Give the enums an operator<< that prints names, not numbers. Tests and
+[X] Give the enums an operator<< that prints names, not numbers. Tests and
     logs become readable ("PartiallyFilled", not "1").
 [X] Stray ';' after the closing brace of main(). Harmless, but remove it.
 

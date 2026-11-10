@@ -125,3 +125,11 @@ Time priority at a price level is ordered by a **sequence number** assigned by t
 - **Sequence numbers, not the wall clock:** time priority comes from an
   engine-assigned sequence number, never from reading the clock. Reading the clock
   inside the engine would break the byte-identical replay test.
+
+## 4. Order fields
+
+- **Price is an integer number of ticks** (`int64_t`), never floating point. It is
+  signed so price differences can be negative and a bad negative input stays visible
+  to validation instead of wrapping into a huge positive value.
+- **Market orders ignore price.** The price field is not used for a market order:
+  matching never reads it, and it plays no part in the replace priority rule.
