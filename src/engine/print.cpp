@@ -51,7 +51,11 @@ std::ostream& operator<<(std::ostream& os, OrderSide s) { return os << to_string
 // One line, fixed field order, no floating point: identical orders always print
 // identically, which keeps logs diffable and the determinism test honest.
 std::ostream& operator<<(std::ostream& os, const Order& o) {
-    return os << "Order{id=" << o.orderId
+    return os << "Order{id=" << o.ids.orderId
+              << " cl=" << o.ids.clOrdId
+              << " orig=" << o.ids.origClOrdId
+              << " chain=" << o.ids.chainId
+              << " seq=" << o.seq
               << " " << o.side
               << " " << o.type
               << " px=" << o.price

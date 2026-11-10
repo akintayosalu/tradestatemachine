@@ -1,7 +1,7 @@
 // Human-readable printing for engine types, for logs and test failures.
 //   std::cout << State::PARTIALLY_FILLED;   // PartiallyFilled
 //   to_string(Event::CANCEL)                // "Cancel"
-//   std::cout << order;                     // Order{id=1 Buy Limit px=10050 qty=1000 filled=0 rem=1000 New}
+//   std::cout << order;  // Order{id=1 cl=100 orig=0 chain=1 seq=1 Buy Limit px=10050 qty=1000 filled=0 rem=1000 New}
 #pragma once
 
 #include <ostream>

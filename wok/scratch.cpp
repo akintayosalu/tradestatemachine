@@ -5,8 +5,9 @@
 #include "engine/print.hpp"
 
 int main() {
-    // id, type, side, price (ticks), quantity
-    Order order{1, OrderType::Limit, OrderSide::Buy, 10000, 1000};
+    // ids, seq, type, side, price (ticks), quantity
+    Order order{OrderIds{.orderId = 1, .clOrdId = 100, .origClOrdId = 0, .chainId = 1},
+                /*seq=*/1, OrderType::Limit, OrderSide::Buy, 10000, 1000};
 
     std::cout << order << std::endl;
     return 0;

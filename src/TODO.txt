@@ -31,21 +31,24 @@ Guidance only. Tick things off as you go. Reference: docs/order_state_machine.md
 Decisions for all of these: docs/design.md section 5.
 [D] = decided, not yet in code.
 
-[D] Internal order ID (engine-assigned) vs client ID (ClOrdID). Replace needs
+[X] Internal order ID (engine-assigned) vs client ID (ClOrdID). Replace needs
     both, plus a link from the replacement back to the old order (OrigClOrdID).
-    -> OrigClOrdID names the CURRENT version; keep Replaced versions in the
-       ClOrdID lookup; optional chain ID. Fields not on Order yet.
+    -> OrderIds {orderId, clOrdId, origClOrdId, chainId} on Order.
+       Still to build later: the ClOrdID -> order lookup (keeps Replaced versions).
 [X] Side, order type, price (ticks), original / filled / remaining qty, state.
-[D] Sequence number (assigned by the engine on accept/replace) for time
+[X] Sequence number (assigned by the engine on accept/replace) for time
     priority. Never wall-clock time.
-    -> owned by the engine instance, not static. Field + counter not in code yet.
+    -> seq field on Order, passed in by the caller (no static counter).
+       The counter itself lives in the engine/book instance once that exists.
 [X] Decide: is remaining stored, or computed as original - filled? Storing
     both means an invariant to keep true; computing it means one can't drift.
     -> stored (final orders have remaining 0, not original - filled).
 [D] Decide: who is allowed to change state? Ideally only the transition
     function, so nothing can skip the matrix.
-    -> only "apply event". Still to do: no setters, and the constructor should
-       not put an order in New by itself (NewOrder event decides New/Rejected).
+    -> only "apply event". Done: fields private, read-only getters, no setters.
+       Still to do in section 2: the constructor still starts orders in New.
+       Once your transition function exists, route creation through the
+       NewOrder event (it decides New vs Rejected) instead.
 
 
 2. THE TRANSITION FUNCTION (the core of this step)
