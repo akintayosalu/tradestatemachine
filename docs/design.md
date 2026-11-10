@@ -137,3 +137,37 @@ Time priority at a price level is ordered by a **sequence number** assigned by t
   - Never compare a market order's price: not in matching, not in the replace
     priority rule, not in logs.
   - Price validation (`price > 0`, tick size) applies to limit orders only.
+
+## 5. Order identity and ownership
+
+- **Client ID vs internal ID.** Clients name orders with a ClOrdID; the engine
+  assigns its own internal ID. Every replace carries a new, unique ClOrdID.
+- **Replace chains link to the current version.** A replace request's OrigClOrdID
+  must name the order's *current* version, not the first one
+  (A -> B with Orig=A, then B -> C with Orig=B).
+  - Every version is its own record: its ClOrdID, the ClOrdID it replaced, its state.
+  - Replaced versions stay in the ClOrdID lookup, so a late "replace A" is rejected
+    as "too late, already replaced" rather than "unknown order".
+  - Optional chain ID (the first version's internal ID), copied into every version,
+    for a stable ID across the chain and easy history lookups. This mirrors FIX,
+    where OrderID stays fixed while ClOrdID changes.
+  - `filled` carries forward, so it always covers the whole chain.
+- **Sequence numbers are owned by the engine instance, never static or global.**
+  - Assigned when an order is accepted, and again on a replace that loses priority.
+    A replace that keeps priority copies the old number.
+  - Why not a static counter: replaying the same log twice in one process (the
+    determinism test) would number the second run differently; multiple engine
+    instances (tests, a standby) would share it; rejected orders would consume
+    numbers; and it can't express "keep the old number".
+  - Later, the sequencer's input-log position can serve as this number.
+- **`remaining` is stored, not computed.** It is not always `original - filled`:
+  a final order (e.g. Cancelled after a partial fill) has `remaining = 0`. Computing
+  it would need a per-state special case. The cost of storing it is that every
+  transition must update it, which the invariant tests check (FIX calls it LeavesQty).
+- **Only applying an event changes state, `filled` and `remaining`.**
+  - These fields are private with no setters. The single way to change them runs the
+    transition function and updates state and quantities together.
+  - The matcher, cancel and replace handlers, the book and tests all produce events;
+    none of them write state directly.
+  - An order enters the system only through the NewOrder event, which decides
+    accepted (New) or Rejected; it never starts in New by construction alone.

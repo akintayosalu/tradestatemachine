@@ -28,15 +28,24 @@ Guidance only. Tick things off as you go. Reference: docs/order_state_machine.md
 
 1. THE ORDER RECORD: fields to think about
 -------------------------------------------
-[ ] Internal order ID (engine-assigned) vs client ID (ClOrdID). Replace needs
+Decisions for all of these: docs/design.md section 5.
+[D] = decided, not yet in code.
+
+[D] Internal order ID (engine-assigned) vs client ID (ClOrdID). Replace needs
     both, plus a link from the replacement back to the old order (OrigClOrdID).
-[ ] Side, order type, price (ticks), original / filled / remaining qty, state.
-[ ] Sequence number (assigned by the engine on accept/replace) for time
+    -> OrigClOrdID names the CURRENT version; keep Replaced versions in the
+       ClOrdID lookup; optional chain ID. Fields not on Order yet.
+[X] Side, order type, price (ticks), original / filled / remaining qty, state.
+[D] Sequence number (assigned by the engine on accept/replace) for time
     priority. Never wall-clock time.
-[ ] Decide: is remaining stored, or computed as original - filled? Storing
+    -> owned by the engine instance, not static. Field + counter not in code yet.
+[X] Decide: is remaining stored, or computed as original - filled? Storing
     both means an invariant to keep true; computing it means one can't drift.
-[ ] Decide: who is allowed to change state? Ideally only the transition
+    -> stored (final orders have remaining 0, not original - filled).
+[D] Decide: who is allowed to change state? Ideally only the transition
     function, so nothing can skip the matrix.
+    -> only "apply event". Still to do: no setters, and the constructor should
+       not put an order in New by itself (NewOrder event decides New/Rejected).
 
 
 2. THE TRANSITION FUNCTION (the core of this step)
