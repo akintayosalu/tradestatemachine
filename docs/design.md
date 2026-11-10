@@ -131,14 +131,9 @@ Time priority at a price level is ordered by a **sequence number** assigned by t
 - **Price is an integer number of ticks** (`int64_t`), never floating point. It is
   signed so price differences can be negative and a bad negative input stays visible
   to validation instead of wrapping into a huge positive value.
-- **Market orders ignore price.** The price field is not used for a market order:
-  matching never reads it, and it plays no part in the replace priority rule.
-
-## 4. Market orders and price
-
-- **Decision:** a market order's price field is ignored. It has no meaning for
-  market orders; matching walks the opposite side from the best price until the
-  order is filled or the book runs out (then the rest is Cancelled, "no liquidity").
-- **Consequences:** never compare a market order's price (matching, replace
-  priority, logs); price validation (`price > 0`, tick size) applies to limit
-  orders only.
+- **Market orders ignore price.** A market order's price field has no meaning:
+  matching walks the opposite side from the best price until the order is filled
+  or the book runs out (then the rest is Cancelled, "no liquidity").
+  - Never compare a market order's price: not in matching, not in the replace
+    priority rule, not in logs.
+  - Price validation (`price > 0`, tick size) applies to limit orders only.
