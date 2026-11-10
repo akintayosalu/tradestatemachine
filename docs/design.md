@@ -133,3 +133,12 @@ Time priority at a price level is ordered by a **sequence number** assigned by t
   to validation instead of wrapping into a huge positive value.
 - **Market orders ignore price.** The price field is not used for a market order:
   matching never reads it, and it plays no part in the replace priority rule.
+
+## 4. Market orders and price
+
+- **Decision:** a market order's price field is ignored. It has no meaning for
+  market orders; matching walks the opposite side from the best price until the
+  order is filled or the book runs out (then the rest is Cancelled, "no liquidity").
+- **Consequences:** never compare a market order's price (matching, replace
+  priority, logs); price validation (`price > 0`, tick size) applies to limit
+  orders only.
