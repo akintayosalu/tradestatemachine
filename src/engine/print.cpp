@@ -1,4 +1,4 @@
-#include "engine/enum_print.hpp"
+#include "engine/print.hpp"
 
 // Each switch deliberately has no `default:`. If you add an enumerator and
 // forget to name it here, -Wall warns (-Wswitch) at compile time.
@@ -47,3 +47,17 @@ std::ostream& operator<<(std::ostream& os, State s)     { return os << to_string
 std::ostream& operator<<(std::ostream& os, Event e)     { return os << to_string(e); }
 std::ostream& operator<<(std::ostream& os, OrderType t) { return os << to_string(t); }
 std::ostream& operator<<(std::ostream& os, OrderSide s) { return os << to_string(s); }
+
+// One line, fixed field order, no floating point: identical orders always print
+// identically, which keeps logs diffable and the determinism test honest.
+std::ostream& operator<<(std::ostream& os, const Order& o) {
+    return os << "Order{id=" << o.orderId
+              << " " << o.side
+              << " " << o.type
+              << " px=" << o.price
+              << " qty=" << o.original
+              << " filled=" << o.filled
+              << " rem=" << o.remaining
+              << " " << o.state
+              << "}";
+}

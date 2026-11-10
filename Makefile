@@ -57,17 +57,27 @@ LIB_OBJS     := $(LIB_SRCS:%.cpp=$(OBJ_DIR)/%.o)
 TEST_OBJS    := $(TEST_SRCS:%.cpp=$(OBJ_DIR)/%.o)
 DEPS         := $(APP_MAIN_OBJ:.o=.d) $(LIB_OBJS:.o=.d) $(TEST_OBJS:.o=.d)
 
-.PHONY: all run release test test-list test-asan clean
+.PHONY: all run release test test-list test-asan clean FORCE
 
 all: $(APP_BIN)
 
-$(APP_BIN): $(APP_MAIN_OBJ) $(LIB_OBJS)
+# Each binary also depends on a file recording its object list. The file is
+# rewritten only when the list changes, so deleting or adding a source file
+# forces a relink (otherwise a deleted test would keep running).
+$(OUT_DIR)/%.objs: FORCE
 	@mkdir -p $(@D)
-	$(CXX) $^ $(LDFLAGS) -o $@
+	@echo '$(OBJS_FOR_$*)' | cmp -s - $@ || echo '$(OBJS_FOR_$*)' > $@
 
-$(TEST_BIN): $(TEST_OBJS) $(LIB_OBJS)
+OBJS_FOR_app         = $(APP_MAIN_OBJ) $(LIB_OBJS)
+OBJS_FOR_test_runner = $(TEST_OBJS) $(LIB_OBJS)
+
+$(APP_BIN): $(APP_MAIN_OBJ) $(LIB_OBJS) $(OUT_DIR)/app.objs
 	@mkdir -p $(@D)
-	$(CXX) $^ $(LDFLAGS) -o $@
+	$(CXX) $(filter %.o,$^) $(LDFLAGS) -o $@
+
+$(TEST_BIN): $(TEST_OBJS) $(LIB_OBJS) $(OUT_DIR)/test_runner.objs
+	@mkdir -p $(@D)
+	$(CXX) $(filter %.o,$^) $(LDFLAGS) -o $@
 
 # Engine and app sources.
 $(OBJ_DIR)/$(SRC_DIR)/%.o: $(SRC_DIR)/%.cpp
