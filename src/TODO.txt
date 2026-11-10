@@ -6,24 +6,24 @@ Guidance only. Tick things off as you go. Reference: docs/order_state_machine.md
 
 0. FIX-UPS TO WHAT YOU HAVE (src/engine/statemachine.cpp)
 ---------------------------------------------------------
-[ ] Remove main() from this file. Only src/main.cpp may have main(). Any other
+[X] Remove main() from this file. Only src/main.cpp may have main(). Any other
     main() in src/ clashes with it (and with the test runner) at link time.
     Scratch experiments with their own main() go in wok/.
-[ ] Split declarations from logic:
+[X] Split declarations from logic:
       include/engine/<name>.hpp : enums, the Order type, function declarations
       src/engine/<name>.cpp     : function bodies
     Tests can only use what's in a header.
-[ ] Include <cstdint> wherever you use uint64_t (it works now only by luck).
-[ ] Price: don't use double. Store price as an integer number of ticks
+[X] Include <cstdint> wherever you use uint64_t (it works now only by luck).
+[X] Price: don't use double. Store price as an integer number of ticks
     (e.g. cents). Doubles make "same price level?" and "price unchanged on
     replace?" comparisons unreliable, and they hurt byte-identical output.
-[ ] Your OrderType {Buy, Sell} is really the *side*. You also need the order
+[X] Your OrderType {Buy, Sell} is really the *side*. You also need the order
     *type*: Limit vs Market. The matrix depends on it (MarketNoLiquidity is a
     Cancel for market orders and a BUG for limit orders).
     Decide what a market order's price field means (unused / ignored).
 [ ] Give the enums an operator<< that prints names, not numbers. Tests and
     logs become readable ("PartiallyFilled", not "1").
-[ ] Stray ';' after the closing brace of main(). Harmless, but remove it.
+[X] Stray ';' after the closing brace of main(). Harmless, but remove it.
 
 
 1. THE ORDER RECORD: fields to think about
