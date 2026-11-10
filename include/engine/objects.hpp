@@ -34,7 +34,8 @@ enum class OrderSide {
 class Order {
     uint64_t orderId;
     OrderType type;
-    int price;
+    OrderSide side;
+    int64_t price;
     uint64_t original;
     uint64_t filled;
     uint64_t remaining;
@@ -43,8 +44,8 @@ class Order {
     public:
         friend std::ostream& operator<<(std::ostream& os, const Order& o);
 
-        Order(uint64_t id, const OrderType& orderType, double price, uint64_t size) :
-            orderId{id}, type{orderType}, price{price}, original{size}, filled{0}, remaining{size}, state{State::NEW}
+        Order(uint64_t id, const OrderType& orderType, OrderSide orderSide, int64_t price, uint64_t size) :
+            orderId{id}, type{orderType}, side{orderSide}, price{price}, original{size}, filled{0}, remaining{size}, state{State::NEW}
         {
         }
 };
