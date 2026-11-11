@@ -43,10 +43,64 @@ std::string_view to_string(OrderSide s) {
     return "<invalid OrderSide>";
 }
 
-std::ostream& operator<<(std::ostream& os, State s)     { return os << to_string(s); }
-std::ostream& operator<<(std::ostream& os, Event e)     { return os << to_string(e); }
-std::ostream& operator<<(std::ostream& os, OrderType t) { return os << to_string(t); }
-std::ostream& operator<<(std::ostream& os, OrderSide s) { return os << to_string(s); }
+std::string_view to_string(RejectReason r) {
+    switch (r) {
+        case RejectReason::UNKNOWN_ORDER:      return "UnknownOrder";
+        case RejectReason::DUPLICATE_ORDER_ID: return "DuplicateOrderId";
+        case RejectReason::INVALID_REPLACE:    return "InvalidReplace";
+        case RejectReason::ALREADY_FILLED:     return "AlreadyFilled";
+        case RejectReason::ALREADY_CANCELLED:  return "AlreadyCancelled";
+        case RejectReason::ALREADY_REJECTED:   return "AlreadyRejected";
+        case RejectReason::ALREADY_REPLACED:   return "AlreadyReplaced";
+        case RejectReason::INVALID_QUANTITY:   return "InvalidQuantity";
+        case RejectReason::INVALID_PRICE:      return "InvalidPrice";
+    }
+    return "<invalid RejectReason>";
+}
+
+std::string_view to_string(OutcomeType t) {
+    switch (t) {
+        case OutcomeType::Accept: return "Accept";
+        case OutcomeType::Reject: return "Reject";
+        case OutcomeType::Bug:    return "Bug";
+    }
+    return "<invalid OutcomeType>";
+}
+
+std::string_view to_string(FillLevel f) {
+    switch (f) {
+        case FillLevel::Partial: return "Partial";
+        case FillLevel::Exact:   return "Exact";
+        case FillLevel::Over:    return "Over";
+    }
+    return "<invalid FillLevel>";
+}
+
+std::ostream& operator<<(std::ostream& os, State s)        { return os << to_string(s); }
+std::ostream& operator<<(std::ostream& os, Event e)        { return os << to_string(e); }
+std::ostream& operator<<(std::ostream& os, OrderType t)    { return os << to_string(t); }
+std::ostream& operator<<(std::ostream& os, OrderSide s)    { return os << to_string(s); }
+std::ostream& operator<<(std::ostream& os, RejectReason r) { return os << to_string(r); }
+std::ostream& operator<<(std::ostream& os, OutcomeType t)  { return os << to_string(t); }
+std::ostream& operator<<(std::ostream& os, FillLevel f)    { return os << to_string(f); }
+
+std::ostream& operator<<(std::ostream& os, const std::optional<RejectReason>& r) {
+    return r ? os << *r : os << "none";
+}
+
+std::ostream& operator<<(std::ostream& os, const std::optional<State>& s) {
+    return s ? os << *s : os << "none";
+}
+
+// Shows only the fields that mean something for the outcome's kind.
+std::ostream& operator<<(std::ostream& os, const Outcome& o) {
+    switch (o.outcomeType) {
+        case OutcomeType::Accept: return os << "Accept->" << o.newState;
+        case OutcomeType::Reject: return os << "Reject(" << o.rejectReason << ")";
+        case OutcomeType::Bug:    return os << "Bug";
+    }
+    return os << "<invalid Outcome>";
+}
 
 // One line, fixed field order, no floating point: identical orders always print
 // identically, which keeps logs diffable and the determinism test honest.

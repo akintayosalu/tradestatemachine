@@ -34,9 +34,18 @@ enum class FillLevel {
     Over,
 };
 
+// Extra facts a few matrix cells depend on. Defaults describe the ordinary case,
+// so a test sets only the field its cell reads, e.g. Context{.orderType = OrderType::Market}.
 struct Context {
-    OrderType orderType;
-    bool replaceValid;
-    FillLevel fillLevel; 
-    std::optional<RejectReason> validationResult;
+    OrderType orderType = OrderType::Limit;                       // MarketNoLiquidity: Market -> Cancelled, Limit -> Bug
+    bool replaceValid = true;                                     // Replace: false -> Reject(INVALID_REPLACE)
+    FillLevel fillLevel = FillLevel::Partial;                     // fill quantity vs remaining; Over is always a Bug
+    std::optional<RejectReason> validationResult = std::nullopt;  // NewOrder on (none): empty = valid
 };
+
+// The state machine: one call = one cell of docs/order_state_machine.md.
+//   current: the order's state, or std::nullopt if no such order exists (the "(none)" row)
+//   event:   what happened
+//   ctx:     extra facts for the conditional cells
+// Pure: no side effects, same inputs always give the same Outcome.
+Outcome decide(std::optional<State> current, Event event, const Context& ctx);
