@@ -172,3 +172,53 @@ TEST_CASE("state: New x MarketNoLiquidity (limit) -> Bug") {
 
     CHECK_EQ(out.outcomeType, OutcomeType::Bug);
 }
+
+// ---------------------------------------------------------------------------
+// Filled row (final state): client events are rejected with a reason,
+// engine events are Bug. Nothing ever leaves a final state.
+// ---------------------------------------------------------------------------
+
+// Client events
+
+TEST_CASE("state: Filled x NewOrder -> Reject(DuplicateOrderId)") {
+    Outcome out = decide(State::FILLED, Event::NEW_ORDER, Context{});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Reject);
+    CHECK_EQ(out.rejectReason, RejectReason::DUPLICATE_ORDER_ID);
+}
+
+TEST_CASE("state: Filled x Cancel -> Reject(AlreadyFilled)") {
+    Outcome out = decide(State::FILLED, Event::CANCEL, Context{});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Reject);
+    CHECK_EQ(out.rejectReason, RejectReason::ALREADY_FILLED);
+}
+
+TEST_CASE("state: Filled x Replace -> Reject(AlreadyFilled)") {
+    // replaceValid = true on purpose: even a valid replace is too late once filled.
+    Outcome out = decide(State::FILLED, Event::REPLACE, Context{.replaceValid = true});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Reject);
+    CHECK_EQ(out.rejectReason, RejectReason::ALREADY_FILLED);
+}
+
+// Engine events: contexts below would be ACCEPTED on a live order, so these
+// prove it's the Filled state itself that makes them a Bug.
+
+TEST_CASE("state: Filled x PartialFill -> Bug") {
+    Outcome out = decide(State::FILLED, Event::PARTIAL_FILL, Context{.fillLevel = FillLevel::Partial});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}
+
+TEST_CASE("state: Filled x FullFill -> Bug") {
+    Outcome out = decide(State::FILLED, Event::FULL_FILL, Context{.fillLevel = FillLevel::Exact});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}
+
+TEST_CASE("state: Filled x MarketNoLiquidity -> Bug") {
+    Outcome out = decide(State::FILLED, Event::MARKET_NO_LIQUIDITY, Context{.orderType = OrderType::Market});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}
