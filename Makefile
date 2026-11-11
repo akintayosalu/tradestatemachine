@@ -96,7 +96,7 @@ release:
 	$(MAKE) BUILD=release
 
 test: $(TEST_BIN)
-	./$(TEST_BIN) $(FILTER)
+	./$(TEST_BIN) '$(FILTER)'
 
 test-list: $(TEST_BIN)
 	./$(TEST_BIN) --list

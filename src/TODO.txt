@@ -53,22 +53,34 @@ Decisions for all of these: docs/design.md section 5.
 
 2. THE TRANSITION FUNCTION (the core of this step)
 --------------------------------------------------
-[ ] Input: current state (including "no such order" for the (none) row),
+[X] Input: current state (including "no such order" for the (none) row),
     the event, and whatever event data it needs (fill qty, order type, ...).
-[ ] Output has three possible kinds, matching the matrix:
+    -> decide(std::optional<State>, Event, const Context&); nullopt = (none).
+[X] Output has three possible kinds, matching the matrix:
       ACCEPT -> new state (+ what report to emit)
       REJECT -> state unchanged + a reason (unknown order, duplicate id,
                 too late filled/cancelled/rejected/replaced, invalid replace)
       BUG    -> engine produced an impossible event; fail loudly
     Decide how you represent these three (it's your design).
-[ ] Represent reject reasons as a fixed set of values, not free text, so
+    -> Outcome {OutcomeType Accept/Reject/Bug, optional RejectReason, newState}.
+[X] Represent reject reasons as a fixed set of values, not free text, so
     tests can compare them exactly.
-[ ] Decide how BUG behaves: assert/abort, or a distinct result the caller
+    -> enum RejectReason (incl. INVALID_QUANTITY, INVALID_PRICE).
+[X] Decide how BUG behaves: assert/abort, or a distinct result the caller
     must handle. Rule from design.md: client events are NEVER a BUG.
-[ ] Fills: PartialFill vs FullFill must agree with quantities (a "partial"
+    -> decide returns Bug as a value (testable). What apply does with it
+       (abort vs. report) is still open: decide in section 3.
+[D] Fills: PartialFill vs FullFill must agree with quantities (a "partial"
     fill that zeroes remaining is a bug). Decide where that is checked.
-[ ] Keep it pure: no printing, no globals, no book access. Same inputs ->
+    -> Context.fillLevel (Partial/Exact/Over), checked in decide. Tests
+       written for the New row; logic not written yet.
+[X] Keep it pure: no printing, no globals, no book access. Same inputs ->
     same outputs. That's what makes it testable and deterministic.
+
+PROGRESS on decide:  (none) row  [written]   New row  [tests written, logic to do]
+                     PartiallyFilled  [ ]    final-state rows  [ ]
+OPEN: invalid NewOrder on (none) currently returns Reject. The order should be
+      recorded in Rejected, so consider Accept -> Rejected + reason instead.
 
 
 3. APPLYING A TRANSITION TO AN ORDER
@@ -87,9 +99,11 @@ Decisions for all of these: docs/design.md section 5.
 ---------------------------------------------------------
 [ ] One TEST_CASE per matrix cell: 7 rows x 6 events = 42. Name them so
     FILTER works, e.g. "state: New x Cancel -> Cancelled".
+    -> in progress: New row done (12 tests), (none) has Cancel only.
 [ ] For REJECT cells, check the reason AND that the order is unchanged.
-[ ] For BUG cells, check you get your BUG outcome (if BUG aborts, test it
+[X] For BUG cells, check you get your BUG outcome (if BUG aborts, test it
     differently or make BUG a returnable result).
+    -> Bug is a returnable result; tests CHECK_EQ the outcome kind.
 [ ] Invariant checks after every transition in a test:
       live (New, PartiallyFilled): filled + remaining == original
       final: remaining == 0; Filled also has filled == original
