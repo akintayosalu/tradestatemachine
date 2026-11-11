@@ -14,11 +14,68 @@
 // (none) row: no order with this ID exists -> pass std::nullopt as the state
 // ---------------------------------------------------------------------------
 
+// Client events
+
+TEST_CASE("state: (none) x NewOrder (valid) -> New") {
+    Outcome out = decide(std::nullopt, Event::NEW_ORDER, Context{});  // default: validation passed
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Accept);
+    CHECK_EQ(out.newState, State::NEW);
+}
+
+// Invalid new orders are RECORDED in state Rejected (the matrix: (none) x NewOrder
+// -> Rejected + reason). That's a transition, not "state unchanged", so these
+// expect Accept -> Rejected carrying the validation reason.
+TEST_CASE("state: (none) x NewOrder (invalid quantity) -> Rejected(InvalidQuantity)") {
+    Outcome out = decide(std::nullopt, Event::NEW_ORDER,
+                         Context{.validationResult = RejectReason::INVALID_QUANTITY});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Accept);
+    CHECK_EQ(out.newState, State::REJECTED);
+    CHECK_EQ(out.rejectReason, RejectReason::INVALID_QUANTITY);
+}
+
+TEST_CASE("state: (none) x NewOrder (invalid price) -> Rejected(InvalidPrice)") {
+    Outcome out = decide(std::nullopt, Event::NEW_ORDER,
+                         Context{.validationResult = RejectReason::INVALID_PRICE});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Accept);
+    CHECK_EQ(out.newState, State::REJECTED);
+    CHECK_EQ(out.rejectReason, RejectReason::INVALID_PRICE);
+}
+
 TEST_CASE("state: (none) x Cancel -> Reject") {
     Outcome out = decide(std::nullopt, Event::CANCEL, Context{});
 
     REQUIRE_EQ(out.outcomeType, OutcomeType::Reject);
     CHECK_EQ(out.rejectReason, RejectReason::UNKNOWN_ORDER);
+}
+
+TEST_CASE("state: (none) x Replace -> Reject(UnknownOrder)") {
+    Outcome out = decide(std::nullopt, Event::REPLACE, Context{});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Reject);
+    CHECK_EQ(out.rejectReason, RejectReason::UNKNOWN_ORDER);
+}
+
+// Engine events: the engine can't fill or cancel an order that doesn't exist.
+
+TEST_CASE("state: (none) x PartialFill -> Bug") {
+    Outcome out = decide(std::nullopt, Event::PARTIAL_FILL, Context{});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}
+
+TEST_CASE("state: (none) x FullFill -> Bug") {
+    Outcome out = decide(std::nullopt, Event::FULL_FILL, Context{.fillLevel = FillLevel::Exact});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}
+
+TEST_CASE("state: (none) x MarketNoLiquidity -> Bug") {
+    Outcome out = decide(std::nullopt, Event::MARKET_NO_LIQUIDITY, Context{.orderType = OrderType::Market});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
 }
 
 // ---------------------------------------------------------------------------
