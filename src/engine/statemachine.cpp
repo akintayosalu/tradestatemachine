@@ -1,18 +1,7 @@
-#include <iostream>
-#include <engine/objects.hpp>
+#include "engine/statemachine.hpp"
 
-
-// // Implement the operator overload
-// std::ostream& operator<<(std::ostream& os, const Order& o) {
-//     os << "Order(ID: " << o.orderId << ", Type: " << static_cast<int>(o.type) << ", Price: " << o.price << 
-//     ", Original: " << o.original << ", Filled: " << o.filled << ", Remaining: " << o.remaining << ", State: " << static_cast<int>(o.state) << ")";
-//     return os; // Return the stream to allow chaining (e.g., std::cout << a << b;)
-// }
-
-// int main(){
-//     Order order{static_cast<uint64_t>(1), OrderType::Buy, 100.0, static_cast<uint64_t>(1000)};
-
-//     std::cout << order << std::endl;
-//     return 0;
-
-// }
+// PLACEHOLDER so tests can link. It answers Bug for everything, so every test
+// fails until you replace this body with the real matrix logic.
+Outcome decide(std::optional<State> /*current*/, Event /*event*/, const Context& /*ctx*/) {
+    return Outcome{.outcomeType = OutcomeType::Bug};
+}
