@@ -18,7 +18,7 @@ Outcome decide(std::optional<State> current, Event event, const Context& ctx) {
                     return Outcome{.outcomeType = OutcomeType::Accept, .newState = State::NEW};
                 }
                 else {
-                    return Outcome{.outcomeType = OutcomeType::Reject, .rejectReason = ctx.validationResult};
+                    return Outcome{.outcomeType = OutcomeType::Accept, .rejectReason = ctx.validationResult, .newState = State::REJECTED};
                 }
                 break;
         }
