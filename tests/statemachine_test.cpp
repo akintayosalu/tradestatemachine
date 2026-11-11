@@ -8,11 +8,11 @@
 // Example: an Accept cell.
 // Pattern: call decide, REQUIRE the outcome kind first (if it's wrong, the other
 // fields are meaningless), then CHECK the field that matters for that kind.
-TEST_CASE("state: New x Cancel -> Cancelled") {
-    Outcome out = decide(State::NEW, Event::CANCEL, Context{});
+TEST_CASE("state: (none) x Cancel -> Reject") {
+    Outcome out = decide(std::nullopt, Event::CANCEL, Context{});
 
-    REQUIRE_EQ(out.outcomeType, OutcomeType::Accept);
-    CHECK_EQ(out.newState, State::CANCELLED);
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Reject);
+    CHECK_EQ(out.rejectReason, RejectReason::UNKNOWN_ORDER);
 }
 
 // Other shapes you'll need, same pattern:
