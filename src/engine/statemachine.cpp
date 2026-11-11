@@ -24,5 +24,38 @@ Outcome decide(std::optional<State> current, Event event, const Context& ctx) {
         }
     }
 
+    if (current.value() == State::NEW) {
+        switch (event) {
+            case Event::NEW_ORDER:
+                return Outcome{.outcomeType = OutcomeType::Reject, .rejectReason = RejectReason::DUPLICATE_ORDER_ID};
+            case Event::CANCEL:
+                return Outcome{.outcomeType = OutcomeType::Accept, .newState = State::CANCELLED};
+            case Event::REPLACE:
+                if (!ctx.replaceValid){
+                    return Outcome{.outcomeType = OutcomeType::Reject, .rejectReason = RejectReason::INVALID_REPLACE};
+                } else {
+                    return Outcome{.outcomeType = OutcomeType::Accept, .newState = State::REPLACED};
+                }
+            case Event::PARTIAL_FILL:
+                if (ctx.fillLevel == FillLevel::Partial){
+                    return Outcome{.outcomeType = OutcomeType::Accept, .newState = State::PARTIALLY_FILLED};
+                } else {
+                    return Outcome{.outcomeType = OutcomeType::Bug};
+                }
+            case Event::FULL_FILL:
+                if (ctx.fillLevel == FillLevel::Exact){
+                    return Outcome{.outcomeType = OutcomeType::Accept, .newState = State::FILLED};
+                } else {
+                    return Outcome{.outcomeType = OutcomeType::Bug};
+                }
+            case Event::MARKET_NO_LIQUIDITY:
+                if (ctx.orderType == OrderType::Market) {
+                    return Outcome{.outcomeType = OutcomeType::Accept, .newState = State::CANCELLED};
+                } else {
+                    return Outcome{.outcomeType = OutcomeType::Bug};
+                }
+        }
+    }
+
     return Outcome{.outcomeType = OutcomeType::Bug};
 }
