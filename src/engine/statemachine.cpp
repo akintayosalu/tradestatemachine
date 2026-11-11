@@ -57,5 +57,20 @@ Outcome decide(std::optional<State> current, Event event, const Context& ctx) {
         }
     }
 
+    if (current.value() == State::FILLED) {
+        switch (event) {
+            case Event::NEW_ORDER:
+                return Outcome{.outcomeType = OutcomeType::Reject, .rejectReason = RejectReason::DUPLICATE_ORDER_ID};
+            case Event::CANCEL:
+                return Outcome{.outcomeType = OutcomeType::Reject, .rejectReason = RejectReason::ALREADY_FILLED};
+            case Event::REPLACE:
+                return Outcome{.outcomeType = OutcomeType::Reject, .rejectReason = RejectReason::ALREADY_FILLED};
+            case Event::PARTIAL_FILL:
+            case Event::FULL_FILL:
+            case Event::MARKET_NO_LIQUIDITY:
+                return Outcome{.outcomeType = OutcomeType::Bug};
+        }
+    }
+
     return Outcome{.outcomeType = OutcomeType::Bug};
 }
