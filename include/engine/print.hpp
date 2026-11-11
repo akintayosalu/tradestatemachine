@@ -8,6 +8,7 @@
 #include <string_view>
 
 #include "engine/objects.hpp"
+#include <engine/types.hpp>
 
 std::string_view to_string(State s);
 std::string_view to_string(Event e);

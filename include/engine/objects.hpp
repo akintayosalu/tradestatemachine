@@ -3,33 +3,7 @@
 #include <iostream>
 #include <cstdint>
 
-enum class State {
-    NEW,
-    PARTIALLY_FILLED,
-    FILLED,
-    CANCELLED,
-    REJECTED,
-    REPLACED,
-};
-
-enum class Event {
-    NEW_ORDER,
-    CANCEL,
-    REPLACE,
-    PARTIAL_FILL,
-    FULL_FILL,
-    MARKET_NO_LIQUIDITY,
-};
-
-enum class OrderType {
-    Limit,
-    Market,
-};
-
-enum class OrderSide {
-    Buy,
-    Sell,
-};
+#include <engine/types.hpp>
 
 // Who an order is (docs/design.md section 5). Grouped in a struct so the four
 // IDs can't be passed in the wrong order; build it with designated initializers:
