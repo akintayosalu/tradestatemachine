@@ -135,6 +135,8 @@ Outcome Order::apply(const Event& event, uint64_t fillQuantity, bool validReplac
                 // Handle replacement logic here
                 remaining = 0;
                 break;
+            default:
+                break;
         }
 
     }

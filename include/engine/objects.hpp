@@ -53,5 +53,5 @@ class Order {
         State getState() const { return state; }
 
         // Update the order's state, filled, and remaining fields based on an event.
-        Outcome apply(const Event& event, uint64_t fillQuantity, bool validReplace){}
+        Outcome apply(const Event& event, uint64_t fillQuantity, bool validReplace);
 };
