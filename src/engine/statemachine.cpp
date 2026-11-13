@@ -1,5 +1,7 @@
 #include "engine/statemachine.hpp"
+#include <engine/objects.hpp>
 #include <optional>
+#include <engine/print.hpp>
 
 // The reject reason a final state gives to a client Cancel/Replace.
 static RejectReason tooLateReason(State finalState) {
@@ -96,4 +98,28 @@ Outcome decide(std::optional<State> current, Event event, const Context& ctx) {
     }
 
     return Outcome{.outcomeType = OutcomeType::Bug};
+}
+
+void Order::apply(const Event& event, uint64_t fillQuantity, bool validReplace){
+    //build context for the event
+    Context ctx {};
+    ctx.orderType = type;
+    ctx.replaceValid = validReplace;
+    if (fillQuantity > remaining){
+        ctx.fillLevel = FillLevel::Over;
+    } else if (fillQuantity == remaining){
+        ctx.fillLevel = FillLevel::Exact;
+    } else {
+        ctx.fillLevel = FillLevel::Partial;
+    }
+
+    Outcome outcome = decide(state, event, ctx);
+    if (outcome.outcomeType == OutcomeType::Accept){
+    }
+    else if (outcome.outcomeType == OutcomeType::Reject){
+        std::cout << "The outcome of event " << event << " was rejected with reason " << outcome.rejectReason << std::endl;
+    }
+    else if (outcome.outcomeType == OutcomeType::Bug){
+        std::cout << "The outcome of event " << event << " was a bug" << std::endl;
+    }
 }

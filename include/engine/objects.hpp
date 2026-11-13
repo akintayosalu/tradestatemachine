@@ -50,4 +50,7 @@ class Order {
         uint64_t getFilled() const { return filled; }
         uint64_t getRemaining() const { return remaining; }
         State getState() const { return state; }
+
+        // Update the order's state, filled, and remaining fields based on an event.
+        void apply(const Event& event, uint64_t fillQuantity, bool validReplace){}
 };
