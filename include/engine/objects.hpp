@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include <engine/types.hpp>
+#include <engine/statemachine.hpp>
 
 // Who an order is (docs/design.md section 5). Grouped in a struct so the four
 // IDs can't be passed in the wrong order; build it with designated initializers:
@@ -52,5 +53,5 @@ class Order {
         State getState() const { return state; }
 
         // Update the order's state, filled, and remaining fields based on an event.
-        void apply(const Event& event, uint64_t fillQuantity, bool validReplace){}
+        Outcome apply(const Event& event, uint64_t fillQuantity, bool validReplace){}
 };

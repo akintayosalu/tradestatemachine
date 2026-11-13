@@ -100,7 +100,7 @@ Outcome decide(std::optional<State> current, Event event, const Context& ctx) {
     return Outcome{.outcomeType = OutcomeType::Bug};
 }
 
-void Order::apply(const Event& event, uint64_t fillQuantity, bool validReplace){
+Outcome Order::apply(const Event& event, uint64_t fillQuantity, bool validReplace){
     //build context for the event
     Context ctx {};
     ctx.orderType = type;
@@ -115,6 +115,28 @@ void Order::apply(const Event& event, uint64_t fillQuantity, bool validReplace){
 
     Outcome outcome = decide(state, event, ctx);
     if (outcome.outcomeType == OutcomeType::Accept){
+        state = outcome.newState;
+        switch (state) {
+            case State::FILLED:
+                filled += fillQuantity;
+                remaining -= fillQuantity;
+                break;
+            case State::PARTIALLY_FILLED:
+                filled += fillQuantity;
+                remaining -= fillQuantity;
+                break;
+            case State::CANCELLED:
+                remaining = 0;
+                break;
+            case State::REJECTED:
+                remaining = 0;
+                break;
+            case State::REPLACED:
+                // Handle replacement logic here
+                remaining = 0;
+                break;
+        }
+
     }
     else if (outcome.outcomeType == OutcomeType::Reject){
         std::cout << "The outcome of event " << event << " was rejected with reason " << outcome.rejectReason << std::endl;
@@ -122,4 +144,5 @@ void Order::apply(const Event& event, uint64_t fillQuantity, bool validReplace){
     else if (outcome.outcomeType == OutcomeType::Bug){
         std::cout << "The outcome of event " << event << " was a bug" << std::endl;
     }
+    return outcome;
 }
