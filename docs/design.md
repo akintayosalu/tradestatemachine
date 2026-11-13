@@ -171,3 +171,31 @@ Time priority at a price level is ordered by a **sequence number** assigned by t
     none of them write state directly.
   - An order enters the system only through the NewOrder event, which decides
     accepted (New) or Rejected; it never starts in New by construction alone.
+
+## 6. Handling a Bug: fail-stop
+
+A Bug outcome means the engine produced an impossible event (section 1), so the
+book can no longer be trusted. The policy is **fail-stop**: stop the engine rather
+than keep trading on corrupted state.
+
+- **`decide` and `Order::apply` report Bug as a value; they never stop the program.**
+  - `decide` returns an Outcome of kind Bug.
+  - `apply` returns that Outcome and leaves the order completely unchanged
+    (no state or quantity change, so nothing is half-applied).
+  - Why: both stay testable. If apply aborted, a test of its Bug path would kill
+    the test runner.
+- **The engine's event loop is the one place that stops.** When it gets a Bug
+  outcome, it logs a diagnostic (the order, the event, the context used) and calls
+  `std::abort()`.
+  - The policy lives in one place, so every caller behaves the same.
+- **`std::abort()`, not `assert`.** `assert` is compiled out when `NDEBUG` is set,
+  and the release build (`make release`) sets it. A Bug check must stop the engine
+  in every build, including the one that is benchmarked and run.
+- **All replicas hit the same Bug.** The engine is deterministic, so a standby
+  replaying the same input log reaches the same impossible event at the same point
+  and stops too.
+  - Failover (Project 2) protects against machine and process failures, not
+    against logic errors.
+  - That is still the right outcome: every replica refusing to continue is better
+    than every replica corrupting its book in the same way.
+  - Upside: the Bug reproduces exactly by replaying the log up to that event.

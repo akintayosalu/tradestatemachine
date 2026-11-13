@@ -68,8 +68,8 @@ Decisions for all of these: docs/design.md section 5.
     -> enum RejectReason (incl. INVALID_QUANTITY, INVALID_PRICE).
 [X] Decide how BUG behaves: assert/abort, or a distinct result the caller
     must handle. Rule from design.md: client events are NEVER a BUG.
-    -> decide returns Bug as a value (testable). What apply does with it
-       (abort vs. report) is still open: decide in section 3.
+    -> decide and apply return Bug as a value; apply leaves the order unchanged.
+       The engine loop logs and calls std::abort() (fail-stop, design.md s.6).
 [X] Fills: PartialFill vs FullFill must agree with quantities (a "partial"
     fill that zeroes remaining is a bug). Decide where that is checked.
     -> Context.fillLevel (Partial/Exact/Over), checked in decide's live branch.
