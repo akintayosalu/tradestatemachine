@@ -222,3 +222,232 @@ TEST_CASE("state: Filled x MarketNoLiquidity -> Bug") {
 
     CHECK_EQ(out.outcomeType, OutcomeType::Bug);
 }
+
+// ---------------------------------------------------------------------------
+// PartiallyFilled row (live): same outcomes as New in every cell.
+// ---------------------------------------------------------------------------
+
+// Client events
+
+TEST_CASE("state: PartiallyFilled x NewOrder -> Reject(DuplicateOrderId)") {
+    Outcome out = decide(State::PARTIALLY_FILLED, Event::NEW_ORDER, Context{});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Reject);
+    CHECK_EQ(out.rejectReason, RejectReason::DUPLICATE_ORDER_ID);
+}
+
+TEST_CASE("state: PartiallyFilled x Cancel -> Cancelled") {
+    // Cancels the unfilled rest; the filled part stays filled.
+    Outcome out = decide(State::PARTIALLY_FILLED, Event::CANCEL, Context{});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Accept);
+    CHECK_EQ(out.newState, State::CANCELLED);
+}
+
+// decide describes the OLD order: it becomes Replaced. The caller creates the
+// new version, which starts in PartiallyFilled here (it carries the filled qty).
+TEST_CASE("state: PartiallyFilled x Replace (valid) -> Replaced") {
+    Outcome out = decide(State::PARTIALLY_FILLED, Event::REPLACE, Context{.replaceValid = true});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Accept);
+    CHECK_EQ(out.newState, State::REPLACED);
+}
+
+TEST_CASE("state: PartiallyFilled x Replace (invalid) -> Reject(InvalidReplace)") {
+    // e.g. new quantity <= what's already filled.
+    Outcome out = decide(State::PARTIALLY_FILLED, Event::REPLACE, Context{.replaceValid = false});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Reject);
+    CHECK_EQ(out.rejectReason, RejectReason::INVALID_REPLACE);
+}
+
+// Engine events: fills
+
+TEST_CASE("state: PartiallyFilled x PartialFill (partial) -> PartiallyFilled") {
+    // Another partial fill: stays PartiallyFilled.
+    Outcome out = decide(State::PARTIALLY_FILLED, Event::PARTIAL_FILL, Context{.fillLevel = FillLevel::Partial});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Accept);
+    CHECK_EQ(out.newState, State::PARTIALLY_FILLED);
+}
+
+TEST_CASE("state: PartiallyFilled x PartialFill (exact) -> Bug") {
+    Outcome out = decide(State::PARTIALLY_FILLED, Event::PARTIAL_FILL, Context{.fillLevel = FillLevel::Exact});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}
+
+TEST_CASE("state: PartiallyFilled x PartialFill (over) -> Bug") {
+    Outcome out = decide(State::PARTIALLY_FILLED, Event::PARTIAL_FILL, Context{.fillLevel = FillLevel::Over});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}
+
+TEST_CASE("state: PartiallyFilled x FullFill (exact) -> Filled") {
+    Outcome out = decide(State::PARTIALLY_FILLED, Event::FULL_FILL, Context{.fillLevel = FillLevel::Exact});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Accept);
+    CHECK_EQ(out.newState, State::FILLED);
+}
+
+TEST_CASE("state: PartiallyFilled x FullFill (partial) -> Bug") {
+    Outcome out = decide(State::PARTIALLY_FILLED, Event::FULL_FILL, Context{.fillLevel = FillLevel::Partial});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}
+
+TEST_CASE("state: PartiallyFilled x FullFill (over) -> Bug") {
+    Outcome out = decide(State::PARTIALLY_FILLED, Event::FULL_FILL, Context{.fillLevel = FillLevel::Over});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}
+
+// Engine events: no liquidity
+
+TEST_CASE("state: PartiallyFilled x MarketNoLiquidity (market) -> Cancelled") {
+    // Market order filled partway, then the book ran out: the rest is cancelled.
+    Outcome out = decide(State::PARTIALLY_FILLED, Event::MARKET_NO_LIQUIDITY, Context{.orderType = OrderType::Market});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Accept);
+    CHECK_EQ(out.newState, State::CANCELLED);
+}
+
+TEST_CASE("state: PartiallyFilled x MarketNoLiquidity (limit) -> Bug") {
+    Outcome out = decide(State::PARTIALLY_FILLED, Event::MARKET_NO_LIQUIDITY, Context{.orderType = OrderType::Limit});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}
+
+// ---------------------------------------------------------------------------
+// Cancelled row (final)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("state: Cancelled x NewOrder -> Reject(DuplicateOrderId)") {
+    Outcome out = decide(State::CANCELLED, Event::NEW_ORDER, Context{});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Reject);
+    CHECK_EQ(out.rejectReason, RejectReason::DUPLICATE_ORDER_ID);
+}
+
+TEST_CASE("state: Cancelled x Cancel -> Reject(AlreadyCancelled)") {
+    Outcome out = decide(State::CANCELLED, Event::CANCEL, Context{});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Reject);
+    CHECK_EQ(out.rejectReason, RejectReason::ALREADY_CANCELLED);
+}
+
+TEST_CASE("state: Cancelled x Replace -> Reject(AlreadyCancelled)") {
+    Outcome out = decide(State::CANCELLED, Event::REPLACE, Context{.replaceValid = true});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Reject);
+    CHECK_EQ(out.rejectReason, RejectReason::ALREADY_CANCELLED);
+}
+
+TEST_CASE("state: Cancelled x PartialFill -> Bug") {
+    Outcome out = decide(State::CANCELLED, Event::PARTIAL_FILL, Context{.fillLevel = FillLevel::Partial});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}
+
+TEST_CASE("state: Cancelled x FullFill -> Bug") {
+    Outcome out = decide(State::CANCELLED, Event::FULL_FILL, Context{.fillLevel = FillLevel::Exact});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}
+
+TEST_CASE("state: Cancelled x MarketNoLiquidity -> Bug") {
+    Outcome out = decide(State::CANCELLED, Event::MARKET_NO_LIQUIDITY, Context{.orderType = OrderType::Market});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}
+
+// ---------------------------------------------------------------------------
+// Rejected row (final): the order was recorded but never went live.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("state: Rejected x NewOrder -> Reject(DuplicateOrderId)") {
+    // The client ID was used by the rejected order, so it can't be reused.
+    Outcome out = decide(State::REJECTED, Event::NEW_ORDER, Context{});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Reject);
+    CHECK_EQ(out.rejectReason, RejectReason::DUPLICATE_ORDER_ID);
+}
+
+TEST_CASE("state: Rejected x Cancel -> Reject(AlreadyRejected)") {
+    Outcome out = decide(State::REJECTED, Event::CANCEL, Context{});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Reject);
+    CHECK_EQ(out.rejectReason, RejectReason::ALREADY_REJECTED);
+}
+
+TEST_CASE("state: Rejected x Replace -> Reject(AlreadyRejected)") {
+    Outcome out = decide(State::REJECTED, Event::REPLACE, Context{.replaceValid = true});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Reject);
+    CHECK_EQ(out.rejectReason, RejectReason::ALREADY_REJECTED);
+}
+
+TEST_CASE("state: Rejected x PartialFill -> Bug") {
+    // A rejected order was never in the book, so it can't be filled.
+    Outcome out = decide(State::REJECTED, Event::PARTIAL_FILL, Context{.fillLevel = FillLevel::Partial});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}
+
+TEST_CASE("state: Rejected x FullFill -> Bug") {
+    Outcome out = decide(State::REJECTED, Event::FULL_FILL, Context{.fillLevel = FillLevel::Exact});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}
+
+TEST_CASE("state: Rejected x MarketNoLiquidity -> Bug") {
+    Outcome out = decide(State::REJECTED, Event::MARKET_NO_LIQUIDITY, Context{.orderType = OrderType::Market});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}
+
+// ---------------------------------------------------------------------------
+// Replaced row (final): this version was superseded; the client must use the
+// current version's ClOrdID.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("state: Replaced x NewOrder -> Reject(DuplicateOrderId)") {
+    Outcome out = decide(State::REPLACED, Event::NEW_ORDER, Context{});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Reject);
+    CHECK_EQ(out.rejectReason, RejectReason::DUPLICATE_ORDER_ID);
+}
+
+TEST_CASE("state: Replaced x Cancel -> Reject(AlreadyReplaced)") {
+    Outcome out = decide(State::REPLACED, Event::CANCEL, Context{});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Reject);
+    CHECK_EQ(out.rejectReason, RejectReason::ALREADY_REPLACED);
+}
+
+TEST_CASE("state: Replaced x Replace -> Reject(AlreadyReplaced)") {
+    // Replacing an old version (OrigClOrdID = a superseded ID) is too late.
+    Outcome out = decide(State::REPLACED, Event::REPLACE, Context{.replaceValid = true});
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Reject);
+    CHECK_EQ(out.rejectReason, RejectReason::ALREADY_REPLACED);
+}
+
+TEST_CASE("state: Replaced x PartialFill -> Bug") {
+    // A replaced version left the book; fills go to the current version.
+    Outcome out = decide(State::REPLACED, Event::PARTIAL_FILL, Context{.fillLevel = FillLevel::Partial});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}
+
+TEST_CASE("state: Replaced x FullFill -> Bug") {
+    Outcome out = decide(State::REPLACED, Event::FULL_FILL, Context{.fillLevel = FillLevel::Exact});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}
+
+TEST_CASE("state: Replaced x MarketNoLiquidity -> Bug") {
+    Outcome out = decide(State::REPLACED, Event::MARKET_NO_LIQUIDITY, Context{.orderType = OrderType::Market});
+
+    CHECK_EQ(out.outcomeType, OutcomeType::Bug);
+}

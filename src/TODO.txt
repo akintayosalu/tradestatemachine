@@ -70,17 +70,16 @@ Decisions for all of these: docs/design.md section 5.
     must handle. Rule from design.md: client events are NEVER a BUG.
     -> decide returns Bug as a value (testable). What apply does with it
        (abort vs. report) is still open: decide in section 3.
-[D] Fills: PartialFill vs FullFill must agree with quantities (a "partial"
+[X] Fills: PartialFill vs FullFill must agree with quantities (a "partial"
     fill that zeroes remaining is a bug). Decide where that is checked.
-    -> Context.fillLevel (Partial/Exact/Over), checked in decide. Tests
-       written for the New row; logic not written yet.
+    -> Context.fillLevel (Partial/Exact/Over), checked in decide's live branch.
 [X] Keep it pure: no printing, no globals, no book access. Same inputs ->
     same outputs. That's what makes it testable and deterministic.
 
-PROGRESS on decide:  (none) row  [written]   New row  [tests written, logic to do]
-                     PartiallyFilled  [ ]    final-state rows  [ ]
-OPEN: invalid NewOrder on (none) currently returns Reject. The order should be
-      recorded in Rejected, so consider Accept -> Rejected + reason instead.
+PROGRESS on decide: DONE. All 7 rows implemented and tested.
+  (none), New, Filled: written by you. PartiallyFilled shares New's branch;
+  Cancelled/Rejected/Replaced share Filled's branch via tooLateReason().
+  Invalid NewOrder on (none) -> Accept -> Rejected + reason (resolved).
 
 
 3. APPLYING A TRANSITION TO AN ORDER
@@ -97,9 +96,9 @@ OPEN: invalid NewOrder on (none) currently returns Reject. The order should be
 
 4. TESTS (tests/, one file for the state machine is fine)
 ---------------------------------------------------------
-[ ] One TEST_CASE per matrix cell: 7 rows x 6 events = 42. Name them so
+[X] One TEST_CASE per matrix cell: 7 rows x 6 events = 42. Name them so
     FILTER works, e.g. "state: New x Cancel -> Cancelled".
-    -> in progress: New row done (12 tests), (none) has Cancel only.
+    -> 56 decide tests: every cell, conditional cells once per case.
 [ ] For REJECT cells, check the reason AND that the order is unchanged.
 [X] For BUG cells, check you get your BUG outcome (if BUG aborts, test it
     differently or make BUG a returnable result).
