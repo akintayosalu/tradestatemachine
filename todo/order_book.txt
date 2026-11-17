@@ -1,0 +1,117 @@
+PROJECT 1, STEP 2: ORDER BOOK + MATCHING
+========================================
+Guidance only. Tick things off as you go. Builds on todo/order_definition.txt
+(done): Order, decide, apply, create, replace.
+References: docs/design.md (invariants s.2, replace priority s.3, fail-stop s.6).
+
+Legend: [ ] to do   [X] done   [D] decided, not yet in code
+
+
+0. DECISIONS FIRST (write each answer into docs/design.md)
+-----------------------------------------------------------
+[ ] Who owns Order objects?
+      a) the book stores them inside its price levels, or
+      b) an engine-wide order store owns every order; the book only points
+         to (or holds IDs of) the live ones.
+    Hint: final orders (Filled, Cancelled, Rejected, Replaced) must still be
+    findable so a late Cancel gets "already filled". The book only ever holds
+    LIVE orders. That points toward (b).
+[ ] Lookup keys. You need to find an order by:
+      - client ID (ClOrdID): incoming Cancel/Replace name it. Must also find
+        Replaced versions (design.md s.5) and final orders.
+      - internal ID: to locate it inside the book for removal.
+    Decide which maps exist and what each maps to.
+[ ] Data structures for one side of the book. Start simple and correct:
+    an ordered map from price -> a FIFO queue of orders.
+      - bids: iterate highest price first; asks: lowest price first.
+      - must be deterministic: no unordered containers whose iteration order
+        could leak into output (byte-identical replay test later).
+    Optimise only in the benchmark phase, with numbers to justify it.
+[ ] Removing from the middle of a FIFO queue (cancel of an order that isn't
+    at the front). Decide how: search the level, or keep a handle/iterator
+    to the order's position. Simple first; note the cost.
+
+
+1. THE BOOK (no matching yet)
+-----------------------------
+[ ] Two sides: bids and asks, each a set of price levels.
+[ ] Price level = all resting orders at one price, in time priority
+    (sequence number order). Front of the queue trades first.
+[ ] add(order): only New/PartiallyFilled LIMIT orders rest. Insert at the
+    back of its level; create the level if it doesn't exist.
+    Market orders never rest (they're final after matching).
+[ ] remove(order): take it out of its level; delete the level if it's now
+    empty. Used by: Cancel, the old version on Replace, and fully filled
+    orders during matching.
+[ ] bestBid / bestAsk: the top level of each side, or "none" if empty.
+[ ] Replace in the book (uses Order::replace's result):
+      - old version: remove from the book.
+      - new version, priority KEPT (same seq): takes the old version's
+        place in the queue, not the back.
+      - new version, priority LOST (fresh seq): back of its (possibly new)
+        price level.
+    Decide how to "take the old place" with your chosen queue structure.
+[ ] Book-level queries for tests: number of levels per side, total quantity
+    at a price, order IDs at a price in queue order.
+
+Book invariants (write a checkBook helper, call it after every operation):
+[ ] An order is in the book  <=>  its state is New or PartiallyFilled.
+[ ] No empty price levels.
+[ ] Within a level, sequence numbers strictly increase front to back.
+[ ] Every order sits at the level matching its own price and side.
+[ ] Not crossed: bestBid < bestAsk whenever both exist (holds trivially
+    until matching exists, but check it from the start).
+
+
+2. MATCHING
+-----------
+[ ] Crossing: an incoming order can trade if
+      - buy limit:  price >= bestAsk
+      - sell limit: price <= bestBid
+      - market:     the opposite side is not empty
+[ ] The match loop, for an incoming (aggressor) order:
+      while it has remaining AND it crosses the best opposite level:
+        - take the FRONT order of that level (the resting order)
+        - trade qty   = min(aggressor remaining, resting remaining)
+        - trade price = the RESTING order's price (price improvement goes to
+                        the aggressor)
+        - apply a fill to BOTH orders through Order::apply
+          (PartialFill or FullFill: let fill qty vs remaining decide which;
+          a Bug outcome here means a matcher bug -> fail-stop)
+        - if the resting order is now Filled, remove it from the book
+    then:
+      - limit aggressor with remaining  -> rests in the book (add)
+      - market aggressor with remaining -> MarketNoLiquidity -> Cancelled
+[ ] Market buy walks asks from the lowest price up; market sell walks bids
+    from the highest price down. Each level fully, front to back, before
+    moving to the next price.
+[ ] Record each trade (both order IDs, price, qty) for the execution
+    reports and output log in step 3.
+
+Matching invariants and tests:
+[ ] After every incoming order: book not crossed.
+[ ] Quantity conservation: per trade, both sides' filled go up by the same
+    qty; across a whole test, total bought == total sold.
+[ ] A market order is always final (Filled or Cancelled) after matching and
+    never in the book.
+[ ] Price-time priority: at one price, the earlier order (lower seq) fills
+    first; a better price fills before a worse one regardless of time.
+[ ] Scenarios to cover:
+      - no cross: limit rests, book unchanged otherwise
+      - exact match: both Filled, level removed
+      - aggressor larger than one resting order: walks the queue
+      - aggressor walks several price levels
+      - aggressor partially fills then rests (limit)
+      - market partially fills then Cancelled (no liquidity)
+      - market into an empty side: New -> Cancelled
+      - cancel / replace of a resting order, then matching respects the
+        new queue position
+
+
+3. ENGINE LOOP (preview, its own TODO later)
+--------------------------------------------
+- Read sequenced requests (NewOrder / Cancel / Replace) from an input log.
+- For each: create or look up the order, run it through the book/matcher,
+  write execution reports + book changes to an output log.
+- Owns the sequence counter (fresh seqs) and the fail-stop abort on Bug.
+- Determinism test: same input log twice -> byte-identical output.
