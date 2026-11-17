@@ -18,17 +18,12 @@ NewOrderResult Order::create(const OrderIds& ids, uint64_t seq, OrderType type,
     std::optional<RejectReason> reason = validateNewOrder(type, price, quantity);
     Context ct = {.orderType = type, .validationResult = reason}; 
     Outcome o = decide(std::nullopt, Event::NEW_ORDER, ct);
-    if (o.outcomeType == OutcomeType::Reject) {
-        Order order = Order{ids, seq, type, side, price, 0u}; // Create a rejected order with remaining 0
-        order.state = o.newState;
-        return NewOrderResult{.outcome = o, .order = Order{ids, seq, type, side, price, 0u}};
+    Order order = Order{ids, seq, type, side, price, quantity};
+    order.state = o.newState;
+    if (order.state == State::REJECTED) {
+        order.remaining = 0;  // Rejected orders have nothing left
     }
-    else{
-        //new order is valid
-        Order order = Order{ids, seq, type, side, price, quantity};
-        order.state = o.newState;
-        return NewOrderResult{.outcome = o, .order = Order{ids, seq, type, side, price, quantity}};
-    }
+    return NewOrderResult{.outcome = o, .order = order};
 }
 
 ReplaceResult Order::replace(uint64_t newOrderId, uint64_t newClOrdId, int64_t newPrice,
