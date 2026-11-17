@@ -43,12 +43,11 @@ Decisions for all of these: docs/design.md section 5.
 [X] Decide: is remaining stored, or computed as original - filled? Storing
     both means an invariant to keep true; computing it means one can't drift.
     -> stored (final orders have remaining 0, not original - filled).
-[D] Decide: who is allowed to change state? Ideally only the transition
+[X] Decide: who is allowed to change state? Ideally only the transition
     function, so nothing can skip the matrix.
-    -> only "apply event". Done: fields private, read-only getters, no setters.
-       Still to do in section 2: the constructor still starts orders in New.
-       Once your transition function exists, route creation through the
-       NewOrder event (it decides New vs Rejected) instead.
+    -> only Order's members: apply (transitions), create (birth via NewOrder:
+       New or recorded Rejected), replace (birth of the new version).
+       Fields private, read-only getters, no setters, constructor private.
 
 
 2. THE TRANSITION FUNCTION (the core of this step)
@@ -84,14 +83,22 @@ PROGRESS on decide: DONE. All 7 rows implemented and tested.
 
 3. APPLYING A TRANSITION TO AN ORDER
 ------------------------------------
-[ ] On ACCEPT: update state and quantities together, so invariants hold
+[X] On ACCEPT: update state and quantities together, so invariants hold
     after every single step.
-[ ] On REJECT: change nothing on the order.
-[ ] Replace (FIX style): old order -> Replaced (remaining 0); a NEW order record
+    -> Order::apply; invariants checked after every step in order_test.cpp.
+[X] On REJECT: change nothing on the order.
+    -> checkUnchanged() in reject and Bug scenarios.
+[X] Replace (FIX style): old order -> Replaced (remaining 0); a NEW order record
     is created carrying the old filled qty and starting in the old state
     (New or PartiallyFilled). Priority kept only if price unchanged AND qty
     decreased, otherwise new sequence number. Invalid replace (e.g. new qty
     <= already filled) -> REJECT, old order untouched.
+    -> Order::replace + isValidReplace; replace_test.cpp (14 tests).
+[X] Creation through NewOrder (step 8): validateNewOrder (quantity first, then
+    limit price) + Order::create -> New or recorded Rejected (remaining 0).
+    -> create_test.cpp (11 tests).
+
+PROGRESS on apply/create/replace: DONE.
 
 
 4. TESTS (tests/, one file for the state machine is fine)
@@ -99,18 +106,25 @@ PROGRESS on decide: DONE. All 7 rows implemented and tested.
 [X] One TEST_CASE per matrix cell: 7 rows x 6 events = 42. Name them so
     FILTER works, e.g. "state: New x Cancel -> Cancelled".
     -> 56 decide tests: every cell, conditional cells once per case.
-[ ] For REJECT cells, check the reason AND that the order is unchanged.
+[X] For REJECT cells, check the reason AND that the order is unchanged.
+    -> decide tests check the reason; order/replace/create tests use checkUnchanged.
 [X] For BUG cells, check you get your BUG outcome (if BUG aborts, test it
     differently or make BUG a returnable result).
     -> Bug is a returnable result; tests CHECK_EQ the outcome kind.
-[ ] Invariant checks after every transition in a test:
+[X] Invariant checks after every transition in a test:
       live (New, PartiallyFilled): filled + remaining == original
       final: remaining == 0; Filled also has filled == original
       filled never decreases
-[ ] A few multi-step scenarios from docs/order_state_machine_explained.md
+    -> checkInvariants + checkFilledNeverDecreases (tests/order_helpers.hpp).
+[X] A few multi-step scenarios from docs/order_state_machine_explained.md
     (e.g. market order: New -> PartiallyFilled -> Cancelled on no liquidity;
     replace after a partial fill).
-[ ] Run: make test, then make test-asan.
+    -> order_test.cpp (7) and replace_test.cpp, incl. an A->B->C replace chain.
+[X] Run: make test, then make test-asan.
+    -> 91/91 in both.
+
+SECTIONS 0-4 COMPLETE. Next: section 5 (order book), starting with price
+levels and FIFO per level.
 
 
 5. NOT YET (later steps, don't start these now)

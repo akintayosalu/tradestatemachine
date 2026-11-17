@@ -7,16 +7,23 @@
 #include "engine/objects.hpp"
 #include "engine/print.hpp"
 
+// The constructor is private, so helpers create orders the real way: Order::create.
+// REQUIRE the order came out New, so a scenario never starts from a broken order.
+
 // A fresh limit buy for `qty` at 100.00 (10000 ticks), seq 1.
 inline Order makeLimitBuy(uint64_t qty) {
-    return Order{OrderIds{.orderId = 1, .clOrdId = 100, .origClOrdId = 0, .chainId = 1},
-                 /*seq=*/1, OrderType::Limit, OrderSide::Buy, /*price=*/10000, qty};
+    NewOrderResult r = Order::create(OrderIds{.orderId = 1, .clOrdId = 100, .origClOrdId = 0, .chainId = 1},
+                                     /*seq=*/1, OrderType::Limit, OrderSide::Buy, /*price=*/10000, qty);
+    REQUIRE_EQ(r.order.getState(), State::NEW);
+    return r.order;
 }
 
 // A fresh market buy for `qty` (price is ignored for market orders), seq 1.
 inline Order makeMarketBuy(uint64_t qty) {
-    return Order{OrderIds{.orderId = 2, .clOrdId = 200, .origClOrdId = 0, .chainId = 2},
-                 /*seq=*/1, OrderType::Market, OrderSide::Buy, /*price=*/0, qty};
+    NewOrderResult r = Order::create(OrderIds{.orderId = 2, .clOrdId = 200, .origClOrdId = 0, .chainId = 2},
+                                     /*seq=*/1, OrderType::Market, OrderSide::Buy, /*price=*/0, qty);
+    REQUIRE_EQ(r.order.getState(), State::NEW);
+    return r.order;
 }
 
 // Invariant across steps: filled never goes down. Pass a copy taken before the step.
