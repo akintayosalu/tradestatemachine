@@ -199,3 +199,40 @@ than keep trading on corrupted state.
   - That is still the right outcome: every replica refusing to continue is better
     than every replica corrupting its book in the same way.
   - Upside: the Bug reproduces exactly by replaying the log up to that event.
+
+## 7. Order book structure
+
+Decisions made before coding the book. Simple and correct first; see
+`todo/order_book.txt` ("Possible optimizations") for what to revisit once the
+benchmarks show where time goes.
+
+- **An order store owns every order; the book only indexes live ones.**
+  - Every order ever created (live, final, rejected, replaced versions) lives in
+    one store for its whole life. It never moves.
+  - The book holds only the internal IDs of resting live orders (New or
+    PartiallyFilled limit orders), arranged by price and time.
+  - Why not store orders inside the book: orders that leave the book (filled,
+    cancelled) or never enter it (rejected, market) would vanish or need a second
+    home, and a late Cancel must still find them to answer "already filled".
+- **Two lookups, both hash maps:**
+  - client ID (ClOrdID) -> internal ID, for every version, including Replaced and
+    final ones (incoming Cancel/Replace name a client ID).
+  - internal ID -> Order: this is the store.
+  - The engine assigns internal IDs when a request arrives, before the book sees
+    anything; rejected orders get one too.
+  - Hash maps are safe for determinism only because nothing iterates over them to
+    produce output; output order always comes from the book's ordered walk.
+- **Each side is an ordered map from price to price level.**
+  - Bids iterate highest price first; asks lowest first. The best price is the
+    first level.
+  - A price level is every resting order on that side at that price, in time
+    priority. Empty levels are removed.
+- **A price level is a FIFO linked list (`std::list`) of internal IDs, and every
+  resting order keeps a handle (iterator) to its position.**
+  - Cancel from the middle of a queue is O(1): erase via the handle.
+  - `std::list` iterators stay valid when other elements are inserted or erased,
+    so stored handles never go stale.
+  - Replace that keeps priority: insert the new version's ID at the old version's
+    position, then erase the old one.
+  - The queue holds IDs (not pointers) to start: robust, and quantities are always
+    read from the store. Pointers are a planned optimization.

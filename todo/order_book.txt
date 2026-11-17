@@ -9,27 +9,29 @@ Legend: [ ] to do   [X] done   [D] decided, not yet in code
 
 0. DECISIONS FIRST (write each answer into docs/design.md)
 -----------------------------------------------------------
-[ ] Who owns Order objects?
-      a) the book stores them inside its price levels, or
-      b) an engine-wide order store owns every order; the book only points
-         to (or holds IDs of) the live ones.
-    Hint: final orders (Filled, Cancelled, Rejected, Replaced) must still be
-    findable so a late Cancel gets "already filled". The book only ever holds
-    LIVE orders. That points toward (b).
-[ ] Lookup keys. You need to find an order by:
-      - client ID (ClOrdID): incoming Cancel/Replace name it. Must also find
-        Replaced versions (design.md s.5) and final orders.
-      - internal ID: to locate it inside the book for removal.
-    Decide which maps exist and what each maps to.
-[ ] Data structures for one side of the book. Start simple and correct:
-    an ordered map from price -> a FIFO queue of orders.
-      - bids: iterate highest price first; asks: lowest price first.
-      - must be deterministic: no unordered containers whose iteration order
-        could leak into output (byte-identical replay test later).
-    Optimise only in the benchmark phase, with numbers to justify it.
-[ ] Removing from the middle of a FIFO queue (cancel of an order that isn't
-    at the front). Decide how: search the level, or keep a handle/iterator
-    to the order's position. Simple first; note the cost.
+All four decided; written up in docs/design.md section 7.
+
+[X] Who owns Order objects?
+    -> (b) an order store owns EVERY order for its whole life (live, final,
+       rejected, replaced versions). The book only holds internal IDs of
+       resting live limit orders.
+[X] Lookup keys.
+    -> client ID -> internal ID (every version, incl. Replaced and final)
+       internal ID -> Order (this is the store)
+       Both hash maps. The ENGINE assigns the internal ID when a request
+       arrives (rejected orders get one too); the book never assigns IDs.
+       Nothing iterates these maps to produce output.
+[X] Data structures for one side of the book.
+    -> ordered map: price -> price level. Bids highest first, asks lowest
+       first. Empty levels removed.
+[X] Removing from the middle of a FIFO queue.
+    -> price level = std::list of internal IDs; each resting order keeps a
+       handle (list iterator) to its position. O(1) cancel; list iterators
+       stay valid when other elements change. Replace keeping priority:
+       insert new ID at the old handle's position, then erase the old one.
+[X] What the queue holds.
+    -> internal IDs for now (quantities read from the store).
+       Pointers are a planned optimization (see the end of this file).
 
 
 1. THE BOOK (no matching yet)
@@ -115,3 +117,27 @@ Matching invariants and tests:
   write execution reports + book changes to an output log.
 - Owns the sequence counter (fresh seqs) and the fail-stop abort on Bug.
 - Determinism test: same input log twice -> byte-identical output.
+
+
+4. POSSIBLE OPTIMIZATIONS (come back after benchmarks; NOT now)
+----------------------------------------------------------------
+Rule: change one thing at a time, keep every test green, and measure before
+and after (p50/p99/p99.9 + throughput). Record each result in
+docs/benchmarks.md, including the ones that didn't help.
+
+[ ] Queue holds POINTERS to orders instead of IDs: saves a hash lookup per
+    order touched during matching. Needs a store whose elements never move
+    (node-based map, or a pool/arena), so pointers stay valid.
+[ ] Intrusive linked list: the order itself carries prev/next links, so a
+    level needs no separate list nodes (no allocation per resting order,
+    better cache behaviour). Handle = the order itself.
+[ ] Price levels in an ARRAY indexed by price tick (offset from a base price)
+    instead of an ordered map: O(1) level lookup. Needs a bounded price range
+    and a way to find the next non-empty level fast (e.g. a bitmap).
+[ ] Cache the best bid/ask level instead of asking the map each time.
+[ ] Object pool / arena for Orders and list nodes: no malloc/free on the hot
+    path (allocation shows up in the p99.9 tail).
+[ ] Flat hash map (open addressing) instead of std::unordered_map for the
+    two lookups: fewer cache misses.
+[ ] Smaller order record: drop or move fields matching never touches
+    (hot/cold split) so more orders fit in cache.
