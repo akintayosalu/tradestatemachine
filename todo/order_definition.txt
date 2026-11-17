@@ -1,5 +1,5 @@
-PROJECT 1, STEP 1: ORDER + STATE MACHINE
-========================================
+PROJECT 1, STEP 1: ORDER DEFINITION + STATE MACHINE (COMPLETE)
+=============================================================
 Guidance only. Tick things off as you go. Reference: docs/order_state_machine.md
 (the matrix) and docs/design.md (rules + invariants).
 
@@ -93,7 +93,10 @@ PROGRESS on decide: DONE. All 7 rows implemented and tested.
     (New or PartiallyFilled). Priority kept only if price unchanged AND qty
     decreased, otherwise new sequence number. Invalid replace (e.g. new qty
     <= already filled) -> REJECT, old order untouched.
-    -> Order::replace + isValidReplace; replace_test.cpp (14 tests).
+    -> Order::replace + isValidReplace; replace_test.cpp (18 tests).
+       isValidReplace also applies the new-order price rule (limit price > 0),
+       shared with validateNewOrder via isValidPrice(), so a replace can't create
+       a version that create() would reject.
 [X] Creation through NewOrder (step 8): validateNewOrder (quantity first, then
     limit price) + Order::create -> New or recorded Rejected (remaining 0).
     -> create_test.cpp (11 tests).
@@ -121,7 +124,7 @@ PROGRESS on apply/create/replace: DONE.
     replace after a partial fill).
     -> order_test.cpp (7) and replace_test.cpp, incl. an A->B->C replace chain.
 [X] Run: make test, then make test-asan.
-    -> 91/91 in both.
+    -> 95/95 in both.
 
 SECTIONS 0-4 COMPLETE. Next: section 5 (order book), starting with price
 levels and FIFO per level.

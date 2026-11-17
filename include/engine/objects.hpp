@@ -96,6 +96,8 @@ struct ReplaceResult {
 //   2. limit orders only: price > 0     else INVALID_PRICE   (market price is ignored)
 std::optional<RejectReason> validateNewOrder(OrderType type, int64_t price, uint64_t quantity);
 
-// Is replacing `current` with a new total quantity allowed?
-// The new quantity must be greater than what has already been filled.
-bool isValidReplace(const Order& current, uint64_t newQuantity);
+// Is replacing `current` with a new price and total quantity allowed?
+//   - the new quantity must be greater than what has already been filled
+//   - a limit order's new price must be > 0 (same rule as validateNewOrder), so a
+//     replace can never create a version that Order::create would have rejected
+bool isValidReplace(const Order& current, int64_t newPrice, uint64_t newQuantity);

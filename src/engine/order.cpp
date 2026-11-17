@@ -1,16 +1,22 @@
 #include "engine/objects.hpp"
 
+// The price rule, shared by new orders and replaces so the two can't drift apart.
+// Market orders ignore price (design.md section 4).
+static bool isValidPrice(OrderType type, int64_t price) {
+    return type == OrderType::Market || price > 0;
+}
+
 std::optional<RejectReason> validateNewOrder(OrderType type, int64_t Price, uint64_t quantity) {
     if (quantity == 0) {
         return RejectReason::INVALID_QUANTITY;
-    } else if (type == OrderType::Limit && Price <= 0) {
+    } else if (!isValidPrice(type, Price)) {
         return RejectReason::INVALID_PRICE;
     }
-    return std::nullopt;  
+    return std::nullopt;
 }
 
-bool isValidReplace(const Order& current, uint64_t newQuantity) {
-    return newQuantity > current.getFilled();
+bool isValidReplace(const Order& current, int64_t newPrice, uint64_t newQuantity) {
+    return newQuantity > current.getFilled() && isValidPrice(current.getType(), newPrice);
 }
 
 NewOrderResult Order::create(const OrderIds& ids, uint64_t seq, OrderType type,
@@ -29,7 +35,7 @@ NewOrderResult Order::create(const OrderIds& ids, uint64_t seq, OrderType type,
 ReplaceResult Order::replace(uint64_t newOrderId, uint64_t newClOrdId, int64_t newPrice,
                              uint64_t newQuantity, uint64_t freshSeq) {
     // TODO: validity check, apply Replace to this order, build the new version
-    bool validReplace = isValidReplace(*this, newQuantity);
+    bool validReplace = isValidReplace(*this, newPrice, newQuantity);
     Outcome o = decide(state, Event::REPLACE, Context{.orderType = type, .replaceValid = validReplace});
     if (o.outcomeType == OutcomeType::Accept) {
         uint64_t updateSeq = (newPrice != price || newQuantity >= original) ? freshSeq : seq;  // loses priority if price changed or qty increased

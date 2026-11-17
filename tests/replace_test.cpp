@@ -7,35 +7,52 @@
 #include "order_helpers.hpp"
 
 // ---------------------------------------------------------------------------
-// isValidReplace: new total quantity must exceed what's already filled
+// isValidReplace: new total quantity must exceed what's already filled,
+// and a limit order's new price must be > 0 (same price rule as a new order)
 // ---------------------------------------------------------------------------
 
 TEST_CASE("replace: valid? fresh order, new qty 50 -> yes") {
     Order o = makeLimitBuy(100);
-    CHECK(isValidReplace(o, 50));
+    CHECK(isValidReplace(o, 10000, 50));
 }
 
 TEST_CASE("replace: valid? fresh order, new qty 0 -> no") {
     Order o = makeLimitBuy(100);
-    CHECK(!isValidReplace(o, 0));
+    CHECK(!isValidReplace(o, 10000, 0));
 }
 
 TEST_CASE("replace: valid? filled 30, new qty 31 -> yes") {
     Order o = makeLimitBuy(100);
     REQUIRE_EQ(o.apply(Event::PARTIAL_FILL, 30, true).outcomeType, OutcomeType::Accept);
-    CHECK(isValidReplace(o, 31));
+    CHECK(isValidReplace(o, 10000, 31));
 }
 
 TEST_CASE("replace: valid? filled 30, new qty 30 -> no (nothing left to work)") {
     Order o = makeLimitBuy(100);
     REQUIRE_EQ(o.apply(Event::PARTIAL_FILL, 30, true).outcomeType, OutcomeType::Accept);
-    CHECK(!isValidReplace(o, 30));
+    CHECK(!isValidReplace(o, 10000, 30));
 }
 
 TEST_CASE("replace: valid? filled 30, new qty 20 -> no") {
     Order o = makeLimitBuy(100);
     REQUIRE_EQ(o.apply(Event::PARTIAL_FILL, 30, true).outcomeType, OutcomeType::Accept);
-    CHECK(!isValidReplace(o, 20));
+    CHECK(!isValidReplace(o, 10000, 20));
+}
+
+TEST_CASE("replace: valid? limit order, new price 0 -> no") {
+    // A replace must not create a version that Order::create would have rejected.
+    Order o = makeLimitBuy(100);
+    CHECK(!isValidReplace(o, /*newPrice=*/0, 50));
+}
+
+TEST_CASE("replace: valid? limit order, negative new price -> no") {
+    Order o = makeLimitBuy(100);
+    CHECK(!isValidReplace(o, /*newPrice=*/-5, 50));
+}
+
+TEST_CASE("replace: valid? market order, new price 0 -> yes (price ignored)") {
+    Order o = makeMarketBuy(100);
+    CHECK(isValidReplace(o, /*newPrice=*/0, 50));
 }
 
 // ---------------------------------------------------------------------------
@@ -141,6 +158,18 @@ TEST_CASE("replace: new qty <= filled -> Reject(InvalidReplace), unchanged") {
 
     Order before = o;
     ReplaceResult r = o.replace(3, 300, 10000, /*newQuantity=*/30, 9);
+
+    REQUIRE_EQ(r.outcome.outcomeType, OutcomeType::Reject);
+    CHECK_EQ(r.outcome.rejectReason, RejectReason::INVALID_REPLACE);
+    CHECK(!r.replacement.has_value());
+    checkUnchanged(before, o);
+}
+
+TEST_CASE("replace: limit order to price 0 -> Reject(InvalidReplace), unchanged") {
+    Order o = makeLimitBuy(100);
+
+    Order before = o;
+    ReplaceResult r = o.replace(3, 300, /*newPrice=*/0, 80, 9);
 
     REQUIRE_EQ(r.outcome.outcomeType, OutcomeType::Reject);
     CHECK_EQ(r.outcome.rejectReason, RejectReason::INVALID_REPLACE);
