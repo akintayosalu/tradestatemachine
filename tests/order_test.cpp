@@ -157,3 +157,31 @@ TEST_CASE("order: valid replace after partial 30 -> old version Replaced") {
 //    Expect a Bug outcome and checkUnchanged(before, o): no state change and,
 //    importantly, remaining did NOT wrap around to a huge number.
 // ---------------------------------------------------------------------------
+
+TEST_CASE("order: partial 30 then cancel -> Cancelled, filled stays 30"){
+    Order o = makeLimitBuy(100);
+    REQUIRE_EQ(o.apply(Event::PARTIAL_FILL, 30, true).outcomeType, OutcomeType::Accept);
+
+    Order before = o;
+    Outcome out = o.apply(Event::CANCEL, 0, /*validReplace=*/true);
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Accept);
+    CHECK_EQ(out.newState, State::CANCELLED);
+
+    CHECK_EQ(o.getState(), State::CANCELLED);
+    CHECK_EQ(o.getFilled(), 30u);     // what traded stays traded (it carries to the new version)
+    CHECK_EQ(o.getRemaining(), 0u);   // the old version has nothing left
+    checkInvariants(o);
+    checkFilledNeverDecreases(before, o);
+} 
+
+TEST_CASE("order: fill of 150 on 100 -> Bug, order unchanged"){
+    Order o = makeLimitBuy(100);
+
+    Order before = o;
+    Outcome out = o.apply(Event::FULL_FILL, 150, /*validReplace=*/true);
+
+    REQUIRE_EQ(out.outcomeType, OutcomeType::Bug);
+    checkUnchanged(before, o);
+    checkInvariants(o);
+}
