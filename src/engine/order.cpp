@@ -32,13 +32,24 @@ ReplaceResult Order::replace(uint64_t newOrderId, uint64_t newClOrdId, int64_t n
     bool validReplace = isValidReplace(*this, newQuantity);
     Outcome o = decide(state, Event::REPLACE, Context{.orderType = type, .replaceValid = validReplace});
     if (o.outcomeType == OutcomeType::Accept) {
-        // Update the current order's state to Replaced
-        state = o.newState;
-        // Create the new order version
+        uint64_t updateSeq = (newPrice != price || newQuantity >= original) ? freshSeq : seq;  // loses priority if price changed or qty increased
         uint64_t updateChainId = (ids.chainId == 0) ? ids.orderId : ids.chainId;
         OrderIds newIds{.orderId = newOrderId, .clOrdId = newClOrdId, .origClOrdId = ids.clOrdId, .chainId = updateChainId};
-        Order newOrder(newIds, freshSeq, type, side, newPrice, newQuantity);
-        return ReplaceResult{.outcome = o, .replacement = newOrder};
+        Order replaceOrder(newIds, updateSeq, type, side, newPrice, newQuantity);
+
+        if (state == State::PARTIALLY_FILLED){
+            replaceOrder.filled = filled;  // carry over what was already filled
+            replaceOrder.remaining = newQuantity - filled;  // remaining is new total minus what was already filled
+            replaceOrder.state = State::PARTIALLY_FILLED;  // new version starts in the same state
+        } else {
+            replaceOrder.filled = 0;
+            replaceOrder.remaining = newQuantity;
+        }
+        // Update the current order's state to Replaced
+        state = o.newState;
+        remaining = 0; 
+        
+        return ReplaceResult{.outcome = o, .replacement = replaceOrder};
     } 
     else {
         return ReplaceResult{.outcome = o, .replacement = std::nullopt};  
