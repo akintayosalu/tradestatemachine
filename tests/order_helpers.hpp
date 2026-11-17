@@ -26,6 +26,15 @@ inline Order makeMarketBuy(uint64_t qty) {
     return r.order;
 }
 
+// A fresh limit order with chosen id (also used as clOrdId/chainId), side,
+// price, quantity and seq. For book tests that need many distinct orders.
+inline Order makeLimit(uint64_t id, OrderSide side, int64_t price, uint64_t qty, uint64_t seq) {
+    NewOrderResult r = Order::create(OrderIds{.orderId = id, .clOrdId = id, .origClOrdId = 0, .chainId = id},
+                                     seq, OrderType::Limit, side, price, qty);
+    REQUIRE_EQ(r.order.getState(), State::NEW);
+    return r.order;
+}
+
 // Invariant across steps: filled never goes down. Pass a copy taken before the step.
 inline void checkFilledNeverDecreases(const Order& before, const Order& after) {
     CHECK(after.getFilled() >= before.getFilled());
