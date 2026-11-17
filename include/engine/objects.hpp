@@ -30,14 +30,17 @@ class Order {
     uint64_t remaining;    // stored: final orders have 0, not original - filled
     State state;
 
+    // PRIVATE constructor: only Order's own members (create, replace) can build an
+    // order, so every order is born through decide (design.md section 5).
+    // Everyone else uses Order::create(...).
+    // `seq` is passed in, not generated here: the engine that accepts the order owns the counter.
+    Order(const OrderIds& orderIds, uint64_t seq, OrderType orderType, OrderSide orderSide, int64_t price, uint64_t size) :
+        ids{orderIds}, seq{seq}, type{orderType}, side{orderSide}, price{price}, original{size}, filled{0}, remaining{size}, state{State::NEW}
+    {
+    }
+
     public:
         friend std::ostream& operator<<(std::ostream& os, const Order& o);
-
-        // `seq` is passed in, not generated here: the engine that accepts the order owns the counter.
-        Order(const OrderIds& orderIds, uint64_t seq, OrderType orderType, OrderSide orderSide, int64_t price, uint64_t size) :
-            ids{orderIds}, seq{seq}, type{orderType}, side{orderSide}, price{price}, original{size}, filled{0}, remaining{size}, state{State::NEW}
-        {
-        }
 
         // Read-only access. There are deliberately no setters: state, filled and
         // remaining change only by applying an event (design.md section 5).
