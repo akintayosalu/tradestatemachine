@@ -37,7 +37,7 @@ All four decided; written up in docs/design.md section 7.
 1. THE BOOK (no matching yet)
 -----------------------------
 STATUS: DONE (include/engine/book.hpp, src/engine/book.cpp, tests/book_test.cpp,
-24 tests; 119/119 total, also under make test-asan). One follow-up fix below.
+24 tests; 119/119 total, also under make test-asan).
 
 [X] Two sides: bids and asks, each a set of price levels.
     -> bids: std::map<price, std::list<id>, std::greater>; asks: std::map<price, std::list<id>>
@@ -59,10 +59,11 @@ STATUS: DONE (include/engine/book.hpp, src/engine/book.cpp, tests/book_test.cpp,
       - new version, priority LOST (fresh seq): back of its (possibly new)
         price level.
     -> replaceInPlace (kept) / remove + add (lost).
-[ ] FIX replaceInPlace: `auto orderList = it->second;` makes a COPY of the
+[X] FIX replaceInPlace: `auto orderList = it->second;` makes a COPY of the
     level's list. Inserting/erasing with handle.it (an iterator into the
     REAL list) on the copy is undefined behaviour; it only works by accident
     with this standard library. Use a reference (auto&) like remove() does.
+    -> fixed: auto& in every branch.
 [X] Book-level queries for tests: levelCount, prices (best first),
     idsAt (front first), contains, size.
     (Total quantity at a price needs the store; add it with market data.)
