@@ -86,7 +86,7 @@ bool OrderBook::replaceInPlace(const Order& oldVersion, const Order& newVersion)
     if (handle.side == OrderSide::Buy) {
         auto it = bids.find(handle.price);
         if (it != bids.end()){
-            auto orderList = it->second;
+            auto& orderList = it->second;
             auto newPos = orderList.insert(handle.it, newVersion.getOrderId());
             orderList.erase(handle.it);
             orderHandles.erase(oldVersion.getOrderId());
@@ -97,7 +97,7 @@ bool OrderBook::replaceInPlace(const Order& oldVersion, const Order& newVersion)
     else if (handle.side == OrderSide::Sell) {
         auto it = asks.find(handle.price);
         if (it != asks.end()){
-            auto orderList = it->second;
+            auto& orderList = it->second;
             auto newPos = orderList.insert(handle.it, newVersion.getOrderId());
             orderList.erase(handle.it);
             orderHandles.erase(oldVersion.getOrderId());
