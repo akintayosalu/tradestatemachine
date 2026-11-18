@@ -14,8 +14,20 @@
 
 #include "engine/objects.hpp"
 #include "engine/types.hpp"
+#include <map>
+#include <list>
+
+struct Handle {
+    OrderSide side;
+    int64_t price;
+    std::list<uint64_t>::iterator it;  // iterator to the order's position in the list at that price level
+};
 
 class OrderBook {
+private:
+    std::map<int64_t, std::list<uint64_t>, std::greater<int64_t>> bids;  // price -> list of internal IDs, best first
+    std::map<int64_t, std::list<uint64_t>> asks; 
+    std::unordered_map<uint64_t, Handle> orderHandles;  // internal ID -> handle (side, price, list iterator)
 public:
     // Rest `order` at the BACK of its price level's queue (creating the level
     // if needed). Only live limit orders may rest. Returns false, and changes
