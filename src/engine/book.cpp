@@ -72,7 +72,41 @@ bool OrderBook::remove(const Order& order) {
     return false; 
 }
 
-bool OrderBook::replaceInPlace(const Order& /*oldVersion*/, const Order& /*newVersion*/) { return false; }
+bool OrderBook::replaceInPlace(const Order& oldVersion, const Order& newVersion) {
+    if (oldVersion.getPrice() != newVersion.getPrice() ||
+        oldVersion.getSide() != newVersion.getSide() ||
+        !orderHandles.contains(oldVersion.getOrderId()) ||
+        orderHandles.contains(newVersion.getOrderId()) || 
+        !(newVersion.getState() == State::NEW or newVersion.getState() == State::PARTIALLY_FILLED) ||
+        newVersion.getType() != OrderType::Limit) 
+        {
+            return false;
+        }
+    const Handle& handle = orderHandles[oldVersion.getOrderId()];
+    if (handle.side == OrderSide::Buy) {
+        auto it = bids.find(handle.price);
+        if (it != bids.end()){
+            auto orderList = it->second;
+            auto newPos = orderList.insert(handle.it, newVersion.getOrderId());
+            orderList.erase(handle.it);
+            orderHandles.erase(oldVersion.getOrderId());
+            orderHandles[newVersion.getOrderId()] = Handle{OrderSide::Buy, newVersion.getPrice(), newPos};
+            return true;
+        }
+    }
+    else if (handle.side == OrderSide::Sell) {
+        auto it = asks.find(handle.price);
+        if (it != asks.end()){
+            auto orderList = it->second;
+            auto newPos = orderList.insert(handle.it, newVersion.getOrderId());
+            orderList.erase(handle.it);
+            orderHandles.erase(oldVersion.getOrderId());
+            orderHandles[newVersion.getOrderId()] = Handle{OrderSide::Sell, newVersion.getPrice(), newPos};
+            return true;
+        }
+    }
+     return false; 
+}
 
 std::optional<int64_t> OrderBook::bestBid() const { 
     if (!bids.empty()){
