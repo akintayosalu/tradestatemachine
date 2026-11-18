@@ -82,6 +82,10 @@ Book invariants (checkBook in tests/book_test.cpp, after every operation):
 The book only gives the matcher IDs; the store turns an ID into the Order
 (design.md section 7). Small, but the matcher and engine depend on it.
 
+STATUS: interface + tests written (include/engine/store.hpp,
+tests/store_test.cpp, 13 tests). src/engine/store.cpp has failing
+placeholders: implement them. Run: make test FILTER=store:
+
 [ ] Owns every order for its whole life: internal ID -> Order.
     Live, final, rejected and replaced versions all stay here.
 [ ] client ID -> internal ID, for every version (incl. Replaced and final).
