@@ -36,33 +36,66 @@ All four decided; written up in docs/design.md section 7.
 
 1. THE BOOK (no matching yet)
 -----------------------------
-[ ] Two sides: bids and asks, each a set of price levels.
-[ ] Price level = all resting orders at one price, in time priority
+STATUS: DONE (include/engine/book.hpp, src/engine/book.cpp, tests/book_test.cpp,
+24 tests; 119/119 total, also under make test-asan). One follow-up fix below.
+
+[X] Two sides: bids and asks, each a set of price levels.
+    -> bids: std::map<price, std::list<id>, std::greater>; asks: std::map<price, std::list<id>>
+[X] Price level = all resting orders at one price, in time priority
     (sequence number order). Front of the queue trades first.
-[ ] add(order): only New/PartiallyFilled LIMIT orders rest. Insert at the
+[X] add(order): only New/PartiallyFilled LIMIT orders rest. Insert at the
     back of its level; create the level if it doesn't exist.
     Market orders never rest (they're final after matching).
-[ ] remove(order): take it out of its level; delete the level if it's now
+    -> also refuses duplicates; handle = iterator returned by list::insert.
+[X] remove(order): take it out of its level; delete the level if it's now
     empty. Used by: Cancel, the old version on Replace, and fully filled
     orders during matching.
-[ ] bestBid / bestAsk: the top level of each side, or "none" if empty.
-[ ] Replace in the book (uses Order::replace's result):
+    -> O(1) via orderHandles (internal ID -> side, price, list iterator).
+[X] bestBid / bestAsk: the top level of each side, or "none" if empty.
+[X] Replace in the book (uses Order::replace's result):
       - old version: remove from the book.
       - new version, priority KEPT (same seq): takes the old version's
         place in the queue, not the back.
       - new version, priority LOST (fresh seq): back of its (possibly new)
         price level.
-    Decide how to "take the old place" with your chosen queue structure.
-[ ] Book-level queries for tests: number of levels per side, total quantity
-    at a price, order IDs at a price in queue order.
+    -> replaceInPlace (kept) / remove + add (lost).
+[ ] FIX replaceInPlace: `auto orderList = it->second;` makes a COPY of the
+    level's list. Inserting/erasing with handle.it (an iterator into the
+    REAL list) on the copy is undefined behaviour; it only works by accident
+    with this standard library. Use a reference (auto&) like remove() does.
+[X] Book-level queries for tests: levelCount, prices (best first),
+    idsAt (front first), contains, size.
+    (Total quantity at a price needs the store; add it with market data.)
 
-Book invariants (write a checkBook helper, call it after every operation):
-[ ] An order is in the book  <=>  its state is New or PartiallyFilled.
-[ ] No empty price levels.
-[ ] Within a level, sequence numbers strictly increase front to back.
-[ ] Every order sits at the level matching its own price and side.
-[ ] Not crossed: bestBid < bestAsk whenever both exist (holds trivially
+Book invariants (checkBook in tests/book_test.cpp, after every operation):
+[X] An order is in the book  <=>  its state is New or PartiallyFilled.
+[X] No empty price levels.
+[X] Within a level, sequence numbers strictly increase front to back.
+[X] Every order sits at the level matching its own price and side.
+[X] Not crossed: bestBid < bestAsk whenever both exist (holds trivially
     until matching exists, but check it from the start).
+
+
+1b. THE ORDER STORE (needed before matching)
+--------------------------------------------
+The book only gives the matcher IDs; the store turns an ID into the Order
+(design.md section 7). Small, but the matcher and engine depend on it.
+
+[ ] Owns every order for its whole life: internal ID -> Order.
+    Live, final, rejected and replaced versions all stay here.
+[ ] client ID -> internal ID, for every version (incl. Replaced and final).
+[ ] insert(order): adds both mappings. Refuses (returns false) if the
+    internal ID or the client ID is already used.
+[ ] find by internal ID, find by client ID (empty/null if unknown).
+[ ] "is this client ID already used?" -> the duplicate-order-ID reject.
+[ ] Reference stability: the matcher will hold a reference to an Order while
+    other orders are inserted. Pick a container whose element references
+    stay valid on insert (std::unordered_map and std::map do; std::vector
+    does NOT). Write that down in design.md s.7.
+[ ] Tests: insert/find both ways, duplicate internal ID refused, duplicate
+    client ID refused, unknown IDs not found, a reference taken before many
+    inserts is still valid after them, a replace chain (A, B, C all findable
+    by their own client IDs).
 
 
 2. MATCHING
