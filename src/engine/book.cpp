@@ -22,8 +22,8 @@ bool OrderBook::add(const Order& order) {
             orderHandles[order.getOrderId()] = Handle{OrderSide::Buy, order.getPrice(), bids[order.getPrice()].begin()};
         } else {
             // Price level exists, add the order to the back of the list
-            it->second.push_back(order.getOrderId());
-            orderHandles[order.getOrderId()] = Handle{OrderSide::Buy, order.getPrice(), it->second.end()};
+            auto result_pos = it->second.insert(it->second.end(), order.getOrderId());
+            orderHandles[order.getOrderId()] = Handle{OrderSide::Buy, order.getPrice(), result_pos};
         }
     }
     else if (order.getSide() == OrderSide::Sell){
@@ -33,14 +33,44 @@ bool OrderBook::add(const Order& order) {
             orderHandles[order.getOrderId()] = Handle{OrderSide::Sell, order.getPrice(), asks[order.getPrice()].begin()};
         } else {
             // Price level exists, add the order to the back of the list
-            it->second.push_back(order.getOrderId());
-            orderHandles[order.getOrderId()] = Handle{OrderSide::Sell, order.getPrice(), it->second.end()};
+            auto result_pos = it->second.insert(it->second.end(), order.getOrderId());
+            orderHandles[order.getOrderId()] = Handle{OrderSide::Sell, order.getPrice(), result_pos};
         }
     }
     return true;
 }
 
-bool OrderBook::remove(const Order& /*order*/) { return false; }
+bool OrderBook::remove(const Order& order) { 
+    if (!orderHandles.contains(order.getOrderId())) {
+        return false;  // order not in the book
+    }
+    const Handle& handle = orderHandles[order.getOrderId()];
+    if (handle.side == OrderSide::Buy) {
+        auto it = bids.find(handle.price);
+        if (it != bids.end()) {
+            auto& orderList = it->second;
+            orderList.erase(handle.it);
+            if (orderList.empty()){
+                bids.erase(it);
+            }
+            orderHandles.erase(order.getOrderId());
+            return true;
+        }
+    }
+    else if (handle.side == OrderSide::Sell){
+        auto it = asks.find(handle.price);
+        if (it != asks.end()){
+            auto& orderList = it->second;
+            orderList.erase(handle.it);
+            if (orderList.empty()){
+                asks.erase(it);
+            }
+            orderHandles.erase(order.getOrderId());
+            return true;
+        }
+    } 
+    return false; 
+}
 
 bool OrderBook::replaceInPlace(const Order& /*oldVersion*/, const Order& /*newVersion*/) { return false; }
 
