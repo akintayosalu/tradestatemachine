@@ -12,13 +12,15 @@ bool crosses(const Order& incoming, const OrderBook& book) {
     if (incoming.getSide() == OrderSide::Buy){
         //check top of ask side
         if (book.bestAsk().has_value() && 
-            incoming.getPrice() >= book.bestAsk().value()){
+            ((incoming.getPrice() >= book.bestAsk().value()) ||
+            incoming.getType() == OrderType::Market)){
                 return true;
         }
     } 
     else if (incoming.getSide() == OrderSide::Sell){
         if (book.bestBid().has_value() && 
-            incoming.getPrice() <= book.bestBid().value()){
+            ((incoming.getPrice() <= book.bestBid().value())
+            || incoming.getType() == OrderType::Market)){
                 return true;
         } 
     }
