@@ -39,4 +39,6 @@ private:
     //   - client ID   -> internal ID
     // Pick containers whose element references stay valid when other
     // elements are inserted (std::unordered_map / std::map yes, std::vector no).
+    std::unordered_map<uint64_t, Order> ordersById;  // internal ID -> Order
+    std::unordered_map<uint64_t, uint64_t> clOrdIdToOrderId;  // client ID -> internal ID
 };
