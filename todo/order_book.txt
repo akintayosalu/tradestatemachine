@@ -109,6 +109,24 @@ tests/store_test.cpp, 13 tests; 132/132 total, also under make test-asan).
 
 2. MATCHING
 -----------
+Decisions: docs/design.md section 8 (free function, trade record, store
+first, replace through match, no self-trade prevention, Bug returned).
+
+STATUS: interface + tests written (include/engine/matching.hpp,
+tests/matching_test.cpp, 31 tests). src/engine/matching.cpp has failing
+placeholders: implement crosses() first, then match().
+Run: make test FILTER=match:   (FILTER="match: crosses" for just crosses)
+
+Hints:
+  - Precondition checks come first in match (unknown / not live / already in
+    book -> Bug with no event, nothing changed, no trade ID used).
+  - Each step: best opposite price -> FRONT ID of that level -> store.find.
+    If the store doesn't have it or it isn't live -> Bug (book and store
+    disagree). idsAt() copies the whole level, which is fine for now; a small
+    book method returning just the front ID is a cheap improvement.
+  - Any apply outcome other than Accept -> Bug with that order and event.
+  - The trade ID is taken (and nextTradeId incremented) only for a real trade.
+
 [ ] Crossing: an incoming order can trade if
       - buy limit:  price >= bestAsk
       - sell limit: price <= bestBid

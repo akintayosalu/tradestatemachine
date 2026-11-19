@@ -241,3 +241,60 @@ benchmarks show where time goes.
     position, then erase the old one.
   - The queue holds IDs (not pointers) to start: robust, and quantities are always
     read from the store. Pointers are a planned optimization.
+
+## 8. Matching
+
+Decisions made before coding the matcher. Rules for the loop itself are in
+`todo/order_book.txt` section 2.
+
+- **Matching is a free function: `match(incomingId, book, store, nextTradeId)`.**
+  - It has no state of its own; the book and the store hold all of it. Tests build
+    a book and a store, call it, and check the result.
+  - The engine loop (next step) owns the book, the store and the counters, and
+    calls `match`.
+- **A trade is one fill between the incoming order and ONE resting order:
+  `{tradeId, aggressorId, restingId, price, qty}`.**
+  - An incoming order that crosses several resting orders produces several
+    trades, one per resting order, in the order they happened.
+  - IDs are internal IDs; everything else (client IDs, sides) is in the store.
+  - `price` is always the resting order's price (price improvement goes to the
+    aggressor).
+  - `tradeId` comes from a counter the caller owns and passes in, like seq:
+    consecutive, starting where the previous call left off. Needed for a
+    deterministic output log.
+- **The matcher chooses Partial vs Full fill; `apply` double-checks.**
+  - For each side of a trade: FullFill if the trade qty equals that order's
+    remaining, else PartialFill.
+  - `apply` makes its own Exact/Partial/Over check, so a wrong choice comes back
+    as Bug instead of a silently wrong state. Over can't happen: trade qty is the
+    smaller of the two remainings.
+- **Store first, then match.**
+  - The engine creates the order and inserts it into the store; a Rejected order
+    stops there. `match` takes the internal ID of a stored live order and works
+    on the store's copy, so every fill lands on the one real order.
+  - The matcher holds `Order*` from the store while it works; section 7's
+    reference stability makes that safe.
+- **`match` finishes the incoming order.**
+  - A limit order with quantity left rests at the back of its level (`add`).
+  - A market order with quantity left gets MarketNoLiquidity -> Cancelled.
+  - So after every `match`: the book is not crossed, a market order is final
+    and not in the book, and a limit order is in the book exactly when it has
+    quantity left.
+- **A replace that loses priority goes through `match`, like a new order.**
+  - Remove the old version from the book, insert the new version into the store,
+    call `match` on it. A price change can cross the book (raise a bid to the
+    best ask), and that must trade, not rest crossed.
+  - A replace that keeps priority (same price, smaller qty) can't cross: it stays
+    `replaceInPlace`, no matching.
+- **No self-trade prevention (out of scope).**
+  - Orders have no trader/account field, so "self" isn't defined. Adding it
+    needs that field plus a policy (cancel resting, incoming, or both). A later
+    feature, not an optimization.
+- **A Bug stops `match` at once; the caller aborts.**
+  - Any non-Accept outcome from `apply` during matching is a Bug (a Reject there
+    also means the book and store disagree). So is a broken precondition: the
+    incoming ID isn't in the store, isn't a live order, or is already in the book;
+    or the book names an order the store doesn't have or that isn't live.
+  - `match` returns the Bug (which order, which event if any) along with the
+    trades so far. It does not abort and does not undo: after a Bug the state
+    can't be trusted, and the engine logs it and calls `std::abort()` (section 6).
