@@ -82,25 +82,29 @@ Book invariants (checkBook in tests/book_test.cpp, after every operation):
 The book only gives the matcher IDs; the store turns an ID into the Order
 (design.md section 7). Small, but the matcher and engine depend on it.
 
-STATUS: interface + tests written (include/engine/store.hpp,
-tests/store_test.cpp, 13 tests). src/engine/store.cpp has failing
-placeholders: implement them. Run: make test FILTER=store:
+STATUS: DONE (include/engine/store.hpp, src/engine/store.cpp,
+tests/store_test.cpp, 13 tests; 132/132 total, also under make test-asan).
 
-[ ] Owns every order for its whole life: internal ID -> Order.
+[X] Owns every order for its whole life: internal ID -> Order.
     Live, final, rejected and replaced versions all stay here.
-[ ] client ID -> internal ID, for every version (incl. Replaced and final).
-[ ] insert(order): adds both mappings. Refuses (returns false) if the
+[X] client ID -> internal ID, for every version (incl. Replaced and final).
+[X] insert(order): adds both mappings. Refuses (returns false) if the
     internal ID or the client ID is already used.
-[ ] find by internal ID, find by client ID (empty/null if unknown).
-[ ] "is this client ID already used?" -> the duplicate-order-ID reject.
-[ ] Reference stability: the matcher will hold a reference to an Order while
+[X] find by internal ID, find by client ID (empty/null if unknown).
+[X] "is this client ID already used?" -> the duplicate-order-ID reject.
+[X] Reference stability: the matcher will hold a reference to an Order while
     other orders are inserted. Pick a container whose element references
     stay valid on insert (std::unordered_map and std::map do; std::vector
     does NOT). Write that down in design.md s.7.
-[ ] Tests: insert/find both ways, duplicate internal ID refused, duplicate
+    -> std::unordered_map; noted in design.md s.7.
+[X] Tests: insert/find both ways, duplicate internal ID refused, duplicate
     client ID refused, unknown IDs not found, a reference taken before many
     inserts is still valid after them, a replace chain (A, B, C all findable
     by their own client IDs).
+[ ] Tidy (optional): stale "PLACEHOLDERS" comments at the top of store.cpp
+    and book.cpp; contains() then find() hashes twice (one find + compare
+    with end() is enough); findByClOrdId can reuse find(id); the extra
+    `Order copy` in insert is unneeded (insert already copies).
 
 
 2. MATCHING

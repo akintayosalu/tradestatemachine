@@ -222,6 +222,11 @@ benchmarks show where time goes.
     anything; rejected orders get one too.
   - Hash maps are safe for determinism only because nothing iterates over them to
     produce output; output order always comes from the book's ordered walk.
+  - The store is `std::unordered_map<id, Order>`, chosen partly for **reference
+    stability**: element addresses stay valid when other orders are inserted
+    (rehashing moves buckets, not elements). The matcher can hold an `Order*`
+    from the store while new orders arrive. A `std::vector` would not allow this.
+    Nothing is ever erased from the store, so pointers never dangle.
 - **Each side is an ordered map from price to price level.**
   - Bids iterate highest price first; asks lowest first. The best price is the
     first level.
