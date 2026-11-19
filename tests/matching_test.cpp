@@ -179,6 +179,17 @@ TEST_CASE("match: crosses -> market crosses iff the opposite side is non-empty")
     CHECK(crosses(m.order(11), m.book));
 }
 
+// A market order's price is 0 (ignored), so comparing it like a limit price
+// would make market buys never cross. Both sides, both ways:
+TEST_CASE("match: crosses -> market buy crosses any ask, market sell needs bids") {
+    Market m;
+    m.rest(1, OrderSide::Sell, 10100, 10);  // only asks
+    m.market(10, OrderSide::Buy, 5);
+    m.market(11, OrderSide::Sell, 5);
+    CHECK(crosses(m.order(10), m.book));   // price 0 must not be compared with 10100
+    CHECK(!crosses(m.order(11), m.book));  // no bids
+}
+
 // ===========================================================================
 // No cross: the limit rests
 // ===========================================================================
