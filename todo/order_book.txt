@@ -101,7 +101,7 @@ tests/store_test.cpp, 13 tests; 132/132 total, also under make test-asan).
     client ID refused, unknown IDs not found, a reference taken before many
     inserts is still valid after them, a replace chain (A, B, C all findable
     by their own client IDs).
-[ ] Tidy (optional): stale "PLACEHOLDERS" comments at the top of store.cpp
+[X] Tidy (optional): stale "PLACEHOLDERS" comments at the top of store.cpp
     and book.cpp; contains() then find() hashes twice (one find + compare
     with end() is enough); findByClOrdId can reuse find(id); the extra
     `Order copy` in insert is unneeded (insert already copies).

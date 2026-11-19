@@ -1,8 +1,5 @@
 #include "engine/book.hpp"
 
-// PLACEHOLDERS so the book tests link. Every function returns a deliberately
-// wrong/empty answer, so tests/book_test.cpp fails until you implement them.
-
 bool OrderBook::add(const Order& order) { 
     if (order.getType() == OrderType::Market) {
         return false;  // market orders cannot rest
