@@ -33,7 +33,7 @@ MatchResult match(uint64_t incomingId, OrderBook& book, OrderStore& store, uint6
     if (o == nullptr){
         return {.bug = MatchBug{.orderId = incomingId, .event = std::nullopt}};
     }
-    Order order = *o;
+    Order& order = *o;
 
     if (order.getState() != State::NEW && order.getState() != State::PARTIALLY_FILLED){
         return {.bug = MatchBug{.orderId = incomingId, .event = std::nullopt}};
@@ -66,14 +66,14 @@ MatchResult match(uint64_t incomingId, OrderBook& book, OrderStore& store, uint6
                 if (fillQuantity == order.getRemaining()){
                     Outcome res = order.apply(Event::FULL_FILL, fillQuantity, false);
                     if (res.outcomeType != OutcomeType::Accept){
-                        return {.trades = trades,  .bug = MatchBug{.orderId = matchingOrderId, .event = Event::FULL_FILL}};
+                        return {.trades = trades,  .bug = MatchBug{.orderId = order.getOrderId(), .event = Event::FULL_FILL}};
                     }
 
                 }
                 else if (fillQuantity < order.getRemaining()) {
                     Outcome res = order.apply(Event::PARTIAL_FILL, fillQuantity, false);
                     if (res.outcomeType != OutcomeType::Accept){
-                        return {.trades = trades,  .bug = MatchBug{.orderId = matchingOrderId, .event = Event::PARTIAL_FILL}};
+                        return {.trades = trades,  .bug = MatchBug{.orderId = order.getOrderId(), .event = Event::PARTIAL_FILL}};
                     }
 
                 }
@@ -98,7 +98,7 @@ MatchResult match(uint64_t incomingId, OrderBook& book, OrderStore& store, uint6
                 break;
             }
             case OrderSide::Sell: {
-                auto bidPrice = book.bestAsk().value();
+                auto bidPrice = book.bestBid().value();
                 auto priceLevel = book.idsAt(OrderSide::Buy, bidPrice);
                 auto matchingOrderId = priceLevel.front();
                 Order* matchingOrder = store.find(matchingOrderId);
@@ -114,14 +114,14 @@ MatchResult match(uint64_t incomingId, OrderBook& book, OrderStore& store, uint6
                 if (fillQuantity == order.getRemaining()){
                     Outcome res = order.apply(Event::FULL_FILL, fillQuantity, false);
                     if (res.outcomeType != OutcomeType::Accept){
-                        return {.trades = trades,  .bug = MatchBug{.orderId = matchingOrderId, .event = Event::FULL_FILL}};
+                        return {.trades = trades,  .bug = MatchBug{.orderId = order.getOrderId(), .event = Event::FULL_FILL}};
                     }
 
                 }
                 else if (fillQuantity < order.getRemaining()) {
                     Outcome res = order.apply(Event::PARTIAL_FILL, fillQuantity, false);
                     if (res.outcomeType != OutcomeType::Accept){
-                        return {.trades = trades,  .bug = MatchBug{.orderId = matchingOrderId, .event = Event::PARTIAL_FILL}};
+                        return {.trades = trades,  .bug = MatchBug{.orderId = order.getOrderId(), .event = Event::PARTIAL_FILL}};
                     }
 
                 }
@@ -152,7 +152,7 @@ MatchResult match(uint64_t incomingId, OrderBook& book, OrderStore& store, uint6
             book.add(order);
         }
         else {
-            return {.trades = trades,  .bug = MatchBug{.orderId = order.getOrderId(), .event = Event::MARKET_NO_LIQUIDITY}};
+            order.apply(Event::MARKET_NO_LIQUIDITY, 0, false);
         }
     }
 
