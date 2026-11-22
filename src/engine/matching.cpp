@@ -1,9 +1,6 @@
 #include "engine/matching.hpp"
 #include <algorithm>
 
-// PLACEHOLDERS so tests/matching_test.cpp links. Each returns a deliberately
-// wrong answer, so the matching tests fail until you implement them.
-
 bool crosses(const Order& incoming, const OrderBook& book) {
     if (incoming.getSide() == OrderSide::Buy){
         //check top of ask side
@@ -38,7 +35,7 @@ std::optional<MatchResult> checkValidMatch(const Order* matchingOrder, uint64_t 
 
 //Executes fill for singular order on one side of the trade
 std::optional<MatchResult> executeTrade(const Event& event, Order& order, auto fillQuantity, std::vector<Trade>& trades){
-    Outcome res = order.apply(event, fillQuantity, false);
+    Outcome res = order.apply(event, fillQuantity, /*validReplace=*/true);  // fills ignore it
     if (res.outcomeType != OutcomeType::Accept){
         return MatchResult{.trades = trades,  .bug = MatchBug{.orderId = order.getOrderId(), .event = event}};
     }
@@ -62,7 +59,10 @@ std::optional<MatchResult> executeFill(Order& order, Order* matchingOrder, uint6
     }
 
     if (matchingEvent == Event::FULL_FILL){
-        book.remove(*matchingOrder);
+        // false = it wasn't in the book: book and store disagree -> Bug
+        if (!book.remove(*matchingOrder)){
+            return MatchResult{.trades = trades, .bug = MatchBug{.orderId = matchingOrder->getOrderId()}};
+        }
     }
     return std::nullopt;
 }
@@ -87,6 +87,9 @@ MatchResult match(uint64_t incomingId, OrderBook& book, OrderStore& store, uint6
     std::vector<Trade> trades {};
 
     while (order.getRemaining() > 0 && crosses(order, book)){
+        // The Buy and Sell cases are identical apart from the opposite side and
+        // its best price. They could be merged: work out those two first, then
+        // one shared trade step with no switch.
         switch (side) {
             case OrderSide::Buy: {
                 //get the best ask posiiton
@@ -130,10 +133,18 @@ MatchResult match(uint64_t incomingId, OrderBook& book, OrderStore& store, uint6
 
     if (order.getRemaining() != 0){
         if (order.getType() == OrderType::Limit){
-            book.add(order);
+            // false = refused (already there / not live): can't happen after the
+            // preconditions, so it's a Bug
+            if (!book.add(order)){
+                return {.trades = trades, .bug = MatchBug{.orderId = incomingId}};
+            }
         }
         else {
-            order.apply(Event::MARKET_NO_LIQUIDITY, 0, false);
+            // normal: no liquidity left -> Cancelled. Anything but Accept is a Bug.
+            Outcome res = order.apply(Event::MARKET_NO_LIQUIDITY, 0, /*validReplace=*/true);
+            if (res.outcomeType != OutcomeType::Accept){
+                return {.trades = trades, .bug = MatchBug{.orderId = incomingId, .event = Event::MARKET_NO_LIQUIDITY}};
+            }
         }
     }
 

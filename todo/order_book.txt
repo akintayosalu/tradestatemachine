@@ -168,12 +168,13 @@ Matching invariants and tests:
         new queue position
 
 Tidy (optional, no behaviour change):
-[ ] Check the MarketNoLiquidity apply outcome; non-Accept -> Bug (incoming
+[X] Check the MarketNoLiquidity apply outcome; non-Accept -> Bug (incoming
     ID, MarketNoLiquidity). Same for book.add / book.remove returning false.
-[ ] Merge the identical Buy/Sell cases: work out the opposite side and best
+[-] Merge the identical Buy/Sell cases: work out the opposite side and best
     opposite price first, then one shared trade step (no switch).
-[ ] Remove the stale "PLACEHOLDERS" comment at the top of matching.cpp.
-[ ] Pass validReplace = true (not false) to fills; fills ignore it, but
+    -> kept separate by choice; a comment in match() notes they could merge.
+[X] Remove the stale "PLACEHOLDERS" comment at the top of matching.cpp.
+[X] Pass validReplace = true (not false) to fills; fills ignore it, but
     false reads like "invalid".
 
 
