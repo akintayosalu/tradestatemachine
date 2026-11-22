@@ -45,16 +45,10 @@ std::optional<MatchResult> executeTrade(const Event& event, Order& order, auto f
     return std::nullopt;
 }
 
-//Executes fills for incoming + resting order
-std::optional<MatchResult> executeFill(Order& order, Order* matchingOrder, OrderBook& book, std::vector<Trade>& trades) {
-    auto matchingOrderId = matchingOrder->getOrderId();
-    std::optional<MatchResult> validMatch = checkValidMatch(matchingOrder, matchingOrderId, trades);
-    if (validMatch.has_value()){
-        return validMatch.value();
-    }
-    
-    auto fillQuantity = std::min(order.getRemaining(), matchingOrder->getRemaining());
-    
+//Executes fills for incoming + resting order.
+//The caller has already checked matchingOrder (checkValidMatch) and computed
+//fillQuantity BEFORE the fills, so the same quantity goes into the Trade.
+std::optional<MatchResult> executeFill(Order& order, Order* matchingOrder, uint64_t fillQuantity, OrderBook& book, std::vector<Trade>& trades) {
     Event orderEvent = (fillQuantity == order.getRemaining()) ? Event::FULL_FILL : Event::PARTIAL_FILL;
     std::optional<MatchResult> result = executeTrade(orderEvent, order, fillQuantity, trades);
     if (result.has_value()){
@@ -100,12 +94,17 @@ MatchResult match(uint64_t incomingId, OrderBook& book, OrderStore& store, uint6
                 auto priceLevel = book.idsAt(OrderSide::Sell, askPrice);
                 auto matchingOrderId = priceLevel.front();
                 Order* matchingOrder = store.find(matchingOrderId);
-                std::optional<MatchResult> fillResult = executeFill(order, matchingOrder, book, trades);
+                std::optional<MatchResult> validMatch = checkValidMatch(matchingOrder, matchingOrderId, trades);
+                if (validMatch.has_value()){
+                    return validMatch.value();
+                }
+                // quantity computed once, before the fills change either remaining
+                uint64_t fillQuantity = std::min(order.getRemaining(), matchingOrder->getRemaining());
+                std::optional<MatchResult> fillResult = executeFill(order, matchingOrder, fillQuantity, book, trades);
                 if (fillResult.has_value()){
                     return fillResult.value();
                 }
-                auto fillQuantity = std::min(order.getRemaining(), matchingOrder->getRemaining());
-                trades.push_back({nextTradeId++, incomingId, matchingOrder->getOrderId(), askPrice, fillQuantity});
+                trades.push_back({nextTradeId++, incomingId, matchingOrderId, askPrice, fillQuantity});
                 break;
             }
             case OrderSide::Sell: {
@@ -113,12 +112,17 @@ MatchResult match(uint64_t incomingId, OrderBook& book, OrderStore& store, uint6
                 auto priceLevel = book.idsAt(OrderSide::Buy, bidPrice);
                 auto matchingOrderId = priceLevel.front();
                 Order* matchingOrder = store.find(matchingOrderId);
-                std::optional<MatchResult> fillResult = executeFill(order, matchingOrder, book, trades);
+                std::optional<MatchResult> validMatch = checkValidMatch(matchingOrder, matchingOrderId, trades);
+                if (validMatch.has_value()){
+                    return validMatch.value();
+                }
+                // quantity computed once, before the fills change either remaining
+                uint64_t fillQuantity = std::min(order.getRemaining(), matchingOrder->getRemaining());
+                std::optional<MatchResult> fillResult = executeFill(order, matchingOrder, fillQuantity, book, trades);
                 if (fillResult.has_value()){
                     return fillResult.value();
                 }
-                auto fillQuantity = std::min(order.getRemaining(), matchingOrder->getRemaining());
-                trades.push_back({nextTradeId++, incomingId, matchingOrder->getOrderId(), bidPrice, fillQuantity});
+                trades.push_back({nextTradeId++, incomingId, matchingOrderId, bidPrice, fillQuantity});
                 break;
             }
         }
