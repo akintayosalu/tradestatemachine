@@ -112,10 +112,8 @@ tests/store_test.cpp, 13 tests; 132/132 total, also under make test-asan).
 Decisions: docs/design.md section 8 (free function, trade record, store
 first, replace through match, no self-trade prevention, Bug returned).
 
-STATUS: interface + tests written (include/engine/matching.hpp,
-tests/matching_test.cpp, 31 tests). src/engine/matching.cpp has failing
-placeholders: implement crosses() first, then match().
-Run: make test FILTER=match:   (FILTER="match: crosses" for just crosses)
+STATUS: DONE (include/engine/matching.hpp, src/engine/matching.cpp,
+tests/matching_test.cpp, 32 tests; 164/164 total, also under make test-asan).
 
 Hints:
   - Precondition checks come first in match (unknown / not live / already in
@@ -127,11 +125,11 @@ Hints:
   - Any apply outcome other than Accept -> Bug with that order and event.
   - The trade ID is taken (and nextTradeId incremented) only for a real trade.
 
-[ ] Crossing: an incoming order can trade if
+[X] Crossing: an incoming order can trade if
       - buy limit:  price >= bestAsk
       - sell limit: price <= bestBid
       - market:     the opposite side is not empty
-[ ] The match loop, for an incoming (aggressor) order:
+[X] The match loop, for an incoming (aggressor) order:
       while it has remaining AND it crosses the best opposite level:
         - take the FRONT order of that level (the resting order)
         - trade qty   = min(aggressor remaining, resting remaining)
@@ -144,21 +142,21 @@ Hints:
     then:
       - limit aggressor with remaining  -> rests in the book (add)
       - market aggressor with remaining -> MarketNoLiquidity -> Cancelled
-[ ] Market buy walks asks from the lowest price up; market sell walks bids
+[X] Market buy walks asks from the lowest price up; market sell walks bids
     from the highest price down. Each level fully, front to back, before
     moving to the next price.
-[ ] Record each trade (both order IDs, price, qty) for the execution
+[X] Record each trade (both order IDs, price, qty) for the execution
     reports and output log in step 3.
 
 Matching invariants and tests:
-[ ] After every incoming order: book not crossed.
-[ ] Quantity conservation: per trade, both sides' filled go up by the same
+[X] After every incoming order: book not crossed.
+[X] Quantity conservation: per trade, both sides' filled go up by the same
     qty; across a whole test, total bought == total sold.
-[ ] A market order is always final (Filled or Cancelled) after matching and
+[X] A market order is always final (Filled or Cancelled) after matching and
     never in the book.
-[ ] Price-time priority: at one price, the earlier order (lower seq) fills
+[X] Price-time priority: at one price, the earlier order (lower seq) fills
     first; a better price fills before a worse one regardless of time.
-[ ] Scenarios to cover:
+[X] Scenarios to cover:
       - no cross: limit rests, book unchanged otherwise
       - exact match: both Filled, level removed
       - aggressor larger than one resting order: walks the queue
@@ -168,6 +166,15 @@ Matching invariants and tests:
       - market into an empty side: New -> Cancelled
       - cancel / replace of a resting order, then matching respects the
         new queue position
+
+Tidy (optional, no behaviour change):
+[ ] Check the MarketNoLiquidity apply outcome; non-Accept -> Bug (incoming
+    ID, MarketNoLiquidity). Same for book.add / book.remove returning false.
+[ ] Merge the identical Buy/Sell cases: work out the opposite side and best
+    opposite price first, then one shared trade step (no switch).
+[ ] Remove the stale "PLACEHOLDERS" comment at the top of matching.cpp.
+[ ] Pass validReplace = true (not false) to fills; fills ignore it, but
+    false reads like "invalid".
 
 
 3. ENGINE LOOP (preview, its own TODO later)
