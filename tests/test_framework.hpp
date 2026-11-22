@@ -62,6 +62,16 @@ std::string to_printable(const T& value) {
         std::ostringstream os;
         os << value;
         return os.str();
+    } else if constexpr (requires(const T& v) { v.begin(); v.end(); }) {
+        // containers (e.g. std::vector<uint64_t>): [1, 2, 3]
+        std::string out = "[";
+        bool first = true;
+        for (const auto& element : value) {
+            if (!first) out += ", ";
+            out += to_printable(element);
+            first = false;
+        }
+        return out + "]";
     } else {
         return "<unprintable>";
     }
