@@ -249,3 +249,6 @@ docs/benchmarks.md, including the ones that didn't help.
     two lookups: fewer cache misses.
 [ ] Smaller order record: drop or move fields matching never touches
     (hot/cold split) so more orders fit in cache.
+[ ] Matcher: idsAt() copies a whole price level just to read its front ID.
+    A book method returning only the front ID (or a pointer) avoids it.
+[ ] contains()-then-lookup patterns hash twice; one find() is enough.
