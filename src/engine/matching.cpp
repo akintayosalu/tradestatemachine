@@ -35,7 +35,7 @@ MatchResult match(uint64_t incomingId, OrderBook& book, OrderStore& store, uint6
     }
     Order order = *o;
 
-    if (order.getState() != State::NEW || order.getState() != State::PARTIALLY_FILLED){
+    if (order.getState() != State::NEW && order.getState() != State::PARTIALLY_FILLED){
         return {.bug = MatchBug{.orderId = incomingId, .event = std::nullopt}};
     }
 
