@@ -5,10 +5,6 @@
 // wrong answer, so the matching tests fail until you implement them.
 
 bool crosses(const Order& incoming, const OrderBook& book) {
-    // if (incoming.getState() == State::CANCELLED || incoming.getState() == State::REJECTED 
-    //     || incoming.getState() == State::REPLACED || incoming.getState() == State::FILLED) {
-    //     return false;  // not live
-    // }
     if (incoming.getSide() == OrderSide::Buy){
         //check top of ask side
         if (book.bestAsk().has_value() && 
@@ -25,6 +21,56 @@ bool crosses(const Order& incoming, const OrderBook& book) {
         } 
     }
     return false;
+}
+
+//Checks if resting matching order is valid
+std::optional<MatchResult> checkValidMatch(const Order* matchingOrder, uint64_t matchingOrderId, std::vector<Trade>& trades) {
+    if (matchingOrder == nullptr){
+        return MatchResult{.trades = trades,  .bug = MatchBug{.orderId = matchingOrderId}};
+    }
+
+    if (matchingOrder->getState() != State::NEW && matchingOrder->getState() != State::PARTIALLY_FILLED){
+        return MatchResult{.trades = trades,  .bug = MatchBug{.orderId = matchingOrderId}};
+    }
+    return std::nullopt;
+
+}
+
+//Executes fill for singular order on one side of the trade
+std::optional<MatchResult> executeTrade(const Event& event, Order& order, auto fillQuantity, std::vector<Trade>& trades){
+    Outcome res = order.apply(event, fillQuantity, false);
+    if (res.outcomeType != OutcomeType::Accept){
+        return MatchResult{.trades = trades,  .bug = MatchBug{.orderId = order.getOrderId(), .event = event}};
+    }
+    return std::nullopt;
+}
+
+//Executes fills for incoming + resting order
+std::optional<MatchResult> executeFill(Order& order, Order* matchingOrder, OrderBook& book, std::vector<Trade>& trades) {
+    auto matchingOrderId = matchingOrder->getOrderId();
+    std::optional<MatchResult> validMatch = checkValidMatch(matchingOrder, matchingOrderId, trades);
+    if (validMatch.has_value()){
+        return validMatch.value();
+    }
+    
+    auto fillQuantity = std::min(order.getRemaining(), matchingOrder->getRemaining());
+    
+    Event orderEvent = (fillQuantity == order.getRemaining()) ? Event::FULL_FILL : Event::PARTIAL_FILL;
+    std::optional<MatchResult> result = executeTrade(orderEvent, order, fillQuantity, trades);
+    if (result.has_value()){
+        return result.value();
+    }
+
+    Event matchingEvent = (fillQuantity == matchingOrder->getRemaining()) ? Event::FULL_FILL : Event::PARTIAL_FILL;
+    std::optional<MatchResult> matchingResult = executeTrade(matchingEvent, *matchingOrder, fillQuantity, trades);
+    if (matchingResult.has_value()){
+        return matchingResult.value();
+    }
+
+    if (matchingEvent == Event::FULL_FILL){
+        book.remove(*matchingOrder);
+    }
+    return std::nullopt;
 }
 
 MatchResult match(uint64_t incomingId, OrderBook& book, OrderStore& store, uint64_t& nextTradeId) {
@@ -54,46 +100,11 @@ MatchResult match(uint64_t incomingId, OrderBook& book, OrderStore& store, uint6
                 auto priceLevel = book.idsAt(OrderSide::Sell, askPrice);
                 auto matchingOrderId = priceLevel.front();
                 Order* matchingOrder = store.find(matchingOrderId);
-                if (matchingOrder == nullptr){
-                    return {.trades = trades,  .bug = MatchBug{.orderId = matchingOrderId}};
+                std::optional<MatchResult> fillResult = executeFill(order, matchingOrder, book, trades);
+                if (fillResult.has_value()){
+                    return fillResult.value();
                 }
-
-                if (matchingOrder->getState() != State::NEW && matchingOrder->getState() != State::PARTIALLY_FILLED){
-                    return {.trades = trades,  .bug = MatchBug{.orderId = matchingOrderId}};
-                }
-                
                 auto fillQuantity = std::min(order.getRemaining(), matchingOrder->getRemaining());
-                if (fillQuantity == order.getRemaining()){
-                    Outcome res = order.apply(Event::FULL_FILL, fillQuantity, false);
-                    if (res.outcomeType != OutcomeType::Accept){
-                        return {.trades = trades,  .bug = MatchBug{.orderId = order.getOrderId(), .event = Event::FULL_FILL}};
-                    }
-
-                }
-                else if (fillQuantity < order.getRemaining()) {
-                    Outcome res = order.apply(Event::PARTIAL_FILL, fillQuantity, false);
-                    if (res.outcomeType != OutcomeType::Accept){
-                        return {.trades = trades,  .bug = MatchBug{.orderId = order.getOrderId(), .event = Event::PARTIAL_FILL}};
-                    }
-
-                }
-
-                if (fillQuantity == matchingOrder->getRemaining()){
-                    Outcome res = matchingOrder->apply(Event::FULL_FILL, fillQuantity, false);
-                    if (res.outcomeType != OutcomeType::Accept){
-                        return {.trades = trades,  .bug = MatchBug{.orderId = matchingOrderId, .event = Event::FULL_FILL}};
-                    }
-
-                    book.remove(*matchingOrder);
-
-                }
-                else if (fillQuantity < matchingOrder->getRemaining()) {
-                    Outcome res = matchingOrder->apply(Event::PARTIAL_FILL, fillQuantity, false);
-                    if (res.outcomeType != OutcomeType::Accept){
-                        return {.trades = trades,  .bug = MatchBug{.orderId = matchingOrderId, .event = Event::PARTIAL_FILL}};
-                    }
-
-                }
                 trades.push_back({nextTradeId++, incomingId, matchingOrder->getOrderId(), askPrice, fillQuantity});
                 break;
             }
@@ -102,45 +113,11 @@ MatchResult match(uint64_t incomingId, OrderBook& book, OrderStore& store, uint6
                 auto priceLevel = book.idsAt(OrderSide::Buy, bidPrice);
                 auto matchingOrderId = priceLevel.front();
                 Order* matchingOrder = store.find(matchingOrderId);
-                if (matchingOrder == nullptr){
-                    return {.trades = trades,  .bug = MatchBug{.orderId = matchingOrderId}};
+                std::optional<MatchResult> fillResult = executeFill(order, matchingOrder, book, trades);
+                if (fillResult.has_value()){
+                    return fillResult.value();
                 }
-
-                if (matchingOrder->getState() != State::NEW && matchingOrder->getState() != State::PARTIALLY_FILLED){
-                    return {.trades = trades,  .bug = MatchBug{.orderId = matchingOrderId}};
-                }
-                
                 auto fillQuantity = std::min(order.getRemaining(), matchingOrder->getRemaining());
-                if (fillQuantity == order.getRemaining()){
-                    Outcome res = order.apply(Event::FULL_FILL, fillQuantity, false);
-                    if (res.outcomeType != OutcomeType::Accept){
-                        return {.trades = trades,  .bug = MatchBug{.orderId = order.getOrderId(), .event = Event::FULL_FILL}};
-                    }
-
-                }
-                else if (fillQuantity < order.getRemaining()) {
-                    Outcome res = order.apply(Event::PARTIAL_FILL, fillQuantity, false);
-                    if (res.outcomeType != OutcomeType::Accept){
-                        return {.trades = trades,  .bug = MatchBug{.orderId = order.getOrderId(), .event = Event::PARTIAL_FILL}};
-                    }
-
-                }
-
-                if (fillQuantity == matchingOrder->getRemaining()){
-                    Outcome res = matchingOrder->apply(Event::FULL_FILL, fillQuantity, false);
-                    if (res.outcomeType != OutcomeType::Accept){
-                        return {.trades = trades,  .bug = MatchBug{.orderId = matchingOrderId, .event = Event::FULL_FILL}};
-                    }
-                    book.remove(*matchingOrder);
-
-                }
-                else if (fillQuantity < matchingOrder->getRemaining()) {
-                    Outcome res = matchingOrder->apply(Event::PARTIAL_FILL, fillQuantity, false);
-                    if (res.outcomeType != OutcomeType::Accept){
-                        return {.trades = trades,  .bug = MatchBug{.orderId = matchingOrderId, .event = Event::PARTIAL_FILL}};
-                    }
-
-                }
                 trades.push_back({nextTradeId++, incomingId, matchingOrder->getOrderId(), bidPrice, fillQuantity});
                 break;
             }
