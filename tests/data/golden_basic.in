@@ -1,0 +1,36 @@
+# Golden scenario: one short trading session touching every request path.
+# Expected output: golden_basic.out (checked by hand against docs/io_format.md).
+
+# --- build a book: asks 101.00 x2, 102.00; bids 99.00, 98.00
+NEW clOrdId=201 side=Sell type=Limit px=10100 qty=30
+NEW clOrdId=202 side=Sell type=Limit px=10100 qty=20
+NEW clOrdId=203 side=Sell type=Limit px=10200 qty=50
+NEW clOrdId=204 side=Buy type=Limit px=9900 qty=40
+NEW clOrdId=205 side=Buy type=Limit px=9800 qty=10
+
+# --- rejects: bad price, duplicate ID, bad line
+NEW clOrdId=206 side=Buy type=Limit px=0 qty=10
+NEW clOrdId=201 side=Buy type=Limit px=9900 qty=10
+NEW clOrdId=207 side=Buy type=Limit price=9900 qty=10
+
+# --- a buy sweeps 101.00 and part of 102.00, then nothing left to rest
+NEW clOrdId=208 side=Buy type=Limit px=10200 qty=60
+
+# --- cancel and too-late cancels
+CANCEL clOrdId=205
+CANCEL clOrdId=205
+CANCEL clOrdId=201
+CANCEL clOrdId=999
+
+# --- replace: keep priority (smaller), then lose priority and cross
+NEW clOrdId=209 side=Buy type=Limit px=9900 qty=25
+REPLACE origClOrdId=204 clOrdId=210 px=9900 qty=30
+REPLACE origClOrdId=209 clOrdId=211 px=10200 qty=25
+
+# --- market orders: sell into the bids, buy more than the book has
+NEW clOrdId=212 side=Sell type=Market qty=40
+NEW clOrdId=213 side=Buy type=Market qty=100
+
+# --- stale and invalid replaces
+REPLACE origClOrdId=204 clOrdId=214 px=9900 qty=10
+REPLACE origClOrdId=211 clOrdId=215 px=10200 qty=5

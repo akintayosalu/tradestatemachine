@@ -1,0 +1,45 @@
+ACCEPT request=New clOrdId=201 orderId=1
+STATE clOrdId=201 state=New filled=0 remaining=30
+ACCEPT request=New clOrdId=202 orderId=2
+STATE clOrdId=202 state=New filled=0 remaining=20
+ACCEPT request=New clOrdId=203 orderId=3
+STATE clOrdId=203 state=New filled=0 remaining=50
+ACCEPT request=New clOrdId=204 orderId=4
+STATE clOrdId=204 state=New filled=0 remaining=40
+ACCEPT request=New clOrdId=205 orderId=5
+STATE clOrdId=205 state=New filled=0 remaining=10
+REJECT request=New clOrdId=206 reason=InvalidPrice
+REJECT request=New clOrdId=201 reason=DuplicateOrderId
+MALFORMED line=14
+ACCEPT request=New clOrdId=208 orderId=7
+TRADE tradeId=1 aggressor=208 resting=201 px=10100 qty=30
+STATE clOrdId=201 state=Filled filled=30 remaining=0
+TRADE tradeId=2 aggressor=208 resting=202 px=10100 qty=20
+STATE clOrdId=202 state=Filled filled=20 remaining=0
+TRADE tradeId=3 aggressor=208 resting=203 px=10200 qty=10
+STATE clOrdId=203 state=PartiallyFilled filled=10 remaining=40
+STATE clOrdId=208 state=Filled filled=60 remaining=0
+STATE clOrdId=205 state=Cancelled filled=0 remaining=0
+REJECT request=Cancel clOrdId=205 reason=AlreadyCancelled
+REJECT request=Cancel clOrdId=201 reason=AlreadyFilled
+REJECT request=Cancel clOrdId=999 reason=UnknownOrder
+ACCEPT request=New clOrdId=209 orderId=8
+STATE clOrdId=209 state=New filled=0 remaining=25
+ACCEPT request=Replace clOrdId=210 origClOrdId=204 orderId=9
+STATE clOrdId=204 state=Replaced filled=0 remaining=0
+STATE clOrdId=210 state=New filled=0 remaining=30
+ACCEPT request=Replace clOrdId=211 origClOrdId=209 orderId=10
+STATE clOrdId=209 state=Replaced filled=0 remaining=0
+TRADE tradeId=4 aggressor=211 resting=203 px=10200 qty=25
+STATE clOrdId=203 state=PartiallyFilled filled=35 remaining=15
+STATE clOrdId=211 state=Filled filled=25 remaining=0
+ACCEPT request=New clOrdId=212 orderId=11
+TRADE tradeId=5 aggressor=212 resting=210 px=9900 qty=30
+STATE clOrdId=210 state=Filled filled=30 remaining=0
+STATE clOrdId=212 state=Cancelled filled=30 remaining=0
+ACCEPT request=New clOrdId=213 orderId=12
+TRADE tradeId=6 aggressor=213 resting=203 px=10200 qty=15
+STATE clOrdId=203 state=Filled filled=50 remaining=0
+STATE clOrdId=213 state=Cancelled filled=15 remaining=0
+REJECT request=Replace clOrdId=214 origClOrdId=204 reason=AlreadyReplaced
+REJECT request=Replace clOrdId=215 origClOrdId=211 reason=AlreadyFilled

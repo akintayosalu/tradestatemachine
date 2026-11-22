@@ -178,14 +178,54 @@ Tidy (optional, no behaviour change):
     false reads like "invalid".
 
 
-3. ENGINE LOOP (preview, its own TODO later)
---------------------------------------------
-- Read sequenced requests (NewOrder / Cancel / Replace) from an input log.
-- For each: create or look up the order, run it through the book/matcher,
-  write execution reports + book changes to an output log.
-- Owns the sequence counter (fresh seqs) and the fail-stop abort on Bug.
-- Determinism test: same input log twice -> byte-identical output.
+3. ENGINE LOOP
+--------------
+Decisions: docs/design.md section 9. Exact formats: docs/io_format.md (read it
+first: the tests compare output byte for byte).
 
+STATUS: interface + tests written (include/engine/engine.hpp,
+tests/engine_test.cpp, 22 tests, tests/data/golden_basic.{in,out}).
+src/engine/engine.cpp has failing placeholders.
+Run: make test FILTER="engine: parse"   then   make test FILTER=engine:
+
+Suggested order:
+[ ] parseRequest: split on spaces, first token = request type, then key=value
+    pairs (any order). Reject: unknown type/key, a key twice, missing required
+    key, bad number (std::from_chars: check the WHOLE value was used), bad
+    side/type. px required for Limit NEW, optional for Market.
+[ ] Engine data members: book, store, nextOrderId / nextSeq / nextTradeId
+    (from 1), line number. Members, never static: two engines must be
+    independent (the determinism test runs two).
+[ ] process: count the line; skip blank and '#'; MALFORMED if parse fails.
+[ ] NEW: duplicate check -> create (next ID, next seq) -> insert -> Rejected?
+    REJECT : ACCEPT then match.
+[ ] Reporting a match: for each trade, TRADE (client IDs via store.find on the
+    internal IDs) then STATE of the resting order; then STATE of the incoming
+    order. A match Bug -> BUG line, return false.
+[ ] CANCEL: unknown -> REJECT UnknownOrder. apply(CANCEL): Reject -> REJECT
+    with its reason; Accept -> remove from the book (if it was in it), STATE.
+[ ] REPLACE: checks in io_format.md's order. Remember whether the old version
+    is in the book BEFORE replace() (it's Replaced afterwards). replace(
+    nextOrderId, ...) and use up that ID only if accepted. Insert the new
+    version, ACCEPT, STATE of old, then:
+      same seq  -> replaceInPlace, STATE of new
+      fresh seq -> remove old from book, then match the new one (as NEW)
+[ ] runLog: fresh Engine, split on '\n' (last line may lack one), stop at the
+    first false.
+[ ] Bug paths: any book call that returns false when it can't, any Bug outcome
+    -> BUG line, return false.
+[ ] src/main.cpp: read the input file named on the command line, runLog, write
+    the output to stdout; if it hit a Bug, flush and std::abort().
+    Usage: ./build/debug/app input.log > output.log
+[ ] Order::apply prints "The outcome of event ..." to std::cout. Once main
+    writes the engine output to stdout, those lines get mixed into it (and
+    would break a byte-for-byte compare of the program's output). Remove them
+    or send them to std::cerr.
+
+Determinism (tests already written):
+[ ] Golden file: tests/data/golden_basic.in -> exactly golden_basic.out.
+[ ] Run twice: a 5000-line generated log through two fresh engines -> identical.
+[ ] By hand once main exists: run the app twice on the golden input and diff.
 
 4. POSSIBLE OPTIMIZATIONS (come back after benchmarks; NOT now)
 ----------------------------------------------------------------

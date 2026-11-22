@@ -298,3 +298,34 @@ Decisions made before coding the matcher. Rules for the loop itself are in
   - `match` returns the Bug (which order, which event if any) along with the
     trades so far. It does not abort and does not undo: after a Bug the state
     can't be trusted, and the engine logs it and calls `std::abort()` (section 6).
+
+## 9. Engine loop
+
+Decisions made before coding the engine. The exact text formats are in
+`docs/io_format.md`.
+
+- **Plain-text, one-line-per-request input; one-line-per-event output.**
+  - Easy to write by hand for tests, easy to diff. A binary feed (ITCH-like)
+    comes later with the replay work.
+  - A malformed line is rejected (`MALFORMED`) and the engine carries on: bad
+    input is the client's problem, not an engine Bug.
+- **Output is deterministic by construction.**
+  - Fixed field order, integer prices, no timestamps, no pointers, nothing
+    produced by iterating a hash map. Output order comes from the request order
+    and `match`'s trade order.
+- **`Engine` is a class (unlike `match`).**
+  - It has state that lives between requests: the book, the store, and three
+    counters (internal order IDs, seqs, trade IDs), all starting at 1.
+- **Per-request flow:** NEW: duplicate check, create, store, match. CANCEL:
+  look up, apply, remove from book. REPLACE: duplicate check, look up, replace,
+  then `replaceInPlace` (priority kept) or remove + `match` (priority lost,
+  section 8).
+- **Bug: write one `BUG` line and stop.**
+  - The engine reports it and processes nothing more; the program flushes the
+    output and calls `std::abort()` (section 6). The engine itself doesn't
+    abort, so the Bug path stays testable.
+- **Determinism is tested two ways.**
+  - Golden files: a hand-checked scenario log with its exact expected output.
+    Catches wrong output.
+  - Run twice: a large generated log through two fresh engines must give
+    byte-identical output. Catches nondeterminism.
