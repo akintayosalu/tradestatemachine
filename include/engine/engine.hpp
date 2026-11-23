@@ -48,6 +48,12 @@ private:
     //   - the book and the store
     //   - counters: next internal order ID, next seq, next trade ID (all from 1)
     //   - the current line number (for MALFORMED)
+    OrderBook book;
+    OrderStore store;
+    uint64_t nextOrderId = 1;
+    uint64_t nextSeq = 1;
+    uint64_t nextTradeId = 1;
+    uint64_t lineNumber = 1;
 };
 
 struct RunResult {

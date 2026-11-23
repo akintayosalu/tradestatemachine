@@ -3,6 +3,7 @@
 #include <string>
 #include <sstream>
 #include <charconv>
+#include <engine/print.hpp>
 
 
 // Parse a whole value as a number (uint64_t or int64_t). False if it isn't one:
@@ -161,12 +162,66 @@ std::optional<Request> parseRequest(std::string_view line) {
 }
 
 bool Engine::process(std::string_view line, std::string& out) {
+    if (line.empty() || line[0] == '#') {
+        lineNumber++; // Increment line number for MALFORMED counting
+        return true; // Skip blank and comment lines
+    }
+
+    auto requestOpt = parseRequest(line);
+    if (!requestOpt.has_value()) {
+        out += "MALFORMED line=" + std::to_string(lineNumber) + "\n";
+        lineNumber++;
+        return true; // Continue processing
+    }
+
+    if (requestOpt->type == RequestType::New) {
+        // Handle NEW request
+        if (store.hasClOrdId(requestOpt->clOrdId)) {
+            out += "REJECT request=New clOrdId=" + std::to_string(requestOpt->clOrdId) + " reason=DuplicateOrderId\n";
+        } else {
+            NewOrderResult orderResult = Order::create({nextOrderId, requestOpt->clOrdId, 0, 0}, nextSeq, requestOpt->orderType, 
+                requestOpt->side, requestOpt->price, requestOpt->qty);
+
+            if (orderResult.outcome.outcomeType == OutcomeType::Reject) {
+                out += "REJECT request=New clOrdId=" + std::to_string(requestOpt->clOrdId) + " reason=" 
+                    + std::string(to_string(orderResult.outcome.rejectReason.value())) + "\n";
+                nextOrderId++; // Increment internal order ID even for rejected orders
+                nextSeq++; // Increment sequence number
+                store.insert(orderResult.order);
+                return true;
+            } else if (orderResult.outcome.outcomeType == OutcomeType::Bug) {
+                out += "BUG\n";
+                return false; // Stop processing on Bug
+            }
+
+            store.insert(orderResult.order);
+            out += "ACCEPT request=New clOrdId=" + std::to_string(requestOpt->clOrdId) + " orderId=" + std::to_string(orderResult.order.internalId) + "\n";
+            out += "STATE clOrdId=" + std::to_string(requestOpt->clOrdId) + " state=New filled=0 remaining=" + std::to_string(orderResult.order.qty) + "\n";
+            nextOrderId++;
+            nextSeq++;
+            MatchResult matchResult = match(orderResult.order.getOrderId(), book, store, nextTradeId);
+        }
+    } else if (requestOpt->type == RequestType::Cancel) {
+        // Handle CANCEL request
+        // Implement logic for CANCEL request here
+    } else if (requestOpt->type == RequestType::Replace) {
+        // Handle REPLACE request
+        // Implement logic for REPLACE request here
+    }
     (void)line;
     (void)out;
     return true;
 }
 
 RunResult runLog(std::string_view input) {
-    (void)input;
+    Engine engine {};
+    std::stringstream ss {std::string{input}};
+    std::string line {};
+    std::string output {};
+    while (std::getline(ss, line)){
+
+        engine.process(line, output);
+
+    }
     return RunResult{};
 }
