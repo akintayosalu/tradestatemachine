@@ -189,7 +189,7 @@ src/engine/engine.cpp has failing placeholders.
 Run: make test FILTER="engine: parse"   then   make test FILTER=engine:
 
 Suggested order:
-[ ] parseRequest: split on spaces, first token = request type, then key=value
+[X] parseRequest: split on spaces, first token = request type, then key=value
     pairs (any order). Reject: unknown type/key, a key twice, missing required
     key, bad number (std::from_chars: check the WHOLE value was used), bad
     side/type. px required for Limit NEW, optional for Market.
@@ -252,3 +252,6 @@ docs/benchmarks.md, including the ones that didn't help.
 [ ] Matcher: idsAt() copies a whole price level just to read its front ID.
     A book method returning only the front ID (or a pointer) avoids it.
 [ ] contains()-then-lookup patterns hash twice; one find() is enough.
+[ ] parseRequest: stringstream + a std::string per token/key/value = several
+    allocations per input line. Split the string_view in place instead
+    (find(' ') / substr on the view) and look keys up without copying.
