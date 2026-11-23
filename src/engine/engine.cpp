@@ -161,83 +161,129 @@ std::optional<Request> parseRequest(std::string_view line) {
     return buildRequestBody(requestInfo, requestType);
 }
 
+// ---------------------------------------------------------------------------
+// Output lines (docs/io_format.md). Each appends exactly one line.
+// ---------------------------------------------------------------------------
+
+static void appendState(std::string& out, const Order& o) {
+    out += "STATE clOrdId=" + std::to_string(o.getClOrdId()) +
+           " state=" + std::string(to_string(o.getState())) +
+           " filled=" + std::to_string(o.getFilled()) +
+           " remaining=" + std::to_string(o.getRemaining()) + "\n";
+}
+
+static void appendReject(std::string& out, std::string_view request, uint64_t clOrdId, RejectReason reason) {
+    out += "REJECT request=" + std::string(request) + " clOrdId=" + std::to_string(clOrdId) +
+           " reason=" + std::string(to_string(reason)) + "\n";
+}
+
+// BUG orderId=<id>[ event=<Event>]
+static void appendBug(std::string& out, uint64_t orderId, std::optional<Event> event = std::nullopt) {
+    out += "BUG orderId=" + std::to_string(orderId);
+    if (event.has_value()) {
+        out += " event=" + std::string(to_string(*event));
+    }
+    out += "\n";
+}
+
+// ---------------------------------------------------------------------------
+// Engine
+// ---------------------------------------------------------------------------
+
 bool Engine::process(std::string_view line, std::string& out) {
+    ++lineNumber;  // every line counts, including skipped and malformed ones
     if (line.empty() || line[0] == '#') {
-        lineNumber++; // Increment line number for MALFORMED counting
-        return true; // Skip blank and comment lines
+        return true;  // blank / comment: no output
     }
 
-    auto requestOpt = parseRequest(line);
-    if (!requestOpt.has_value()) {
+    std::optional<Request> request = parseRequest(line);
+    if (!request.has_value()) {
         out += "MALFORMED line=" + std::to_string(lineNumber) + "\n";
-        lineNumber++;
-        return true; // Continue processing
+        return true;  // bad input is not a Bug: carry on
     }
 
-    lineNumber++;
-
-    if (requestOpt->type == RequestType::New) {
-        // Handle NEW request
-        if (store.hasClOrdId(requestOpt->clOrdId)) {
-            out += "REJECT request=New clOrdId=" + std::to_string(requestOpt->clOrdId) + " reason=DuplicateOrderId\n";
-        } else {
-            NewOrderResult orderResult = Order::create({nextOrderId, requestOpt->clOrdId, 0, 0}, nextSeq, requestOpt->orderType, 
-                requestOpt->side, requestOpt->price, requestOpt->qty);
-
-            if (orderResult.outcome.outcomeType == OutcomeType::Reject) {
-                out += "REJECT request=New clOrdId=" + std::to_string(requestOpt->clOrdId) + " reason=" 
-                    + std::string(to_string(orderResult.outcome.rejectReason.value())) + "\n";
-                nextOrderId++; // Increment internal order ID even for rejected orders
-                nextSeq++; // Increment sequence number
-                store.insert(orderResult.order);
-                return true;
-            } 
-            if (orderResult.outcome.outcomeType == OutcomeType::Accept && orderResult.order.getState() == State::REJECTED) {
-                out += "REJECT request=New clOrdId=" + std::to_string(requestOpt->clOrdId) + " reason=" 
-                    + std::string(to_string(orderResult.outcome.rejectReason.value())) + "\n";
-                nextOrderId++; // Increment internal order ID even for rejected orders
-                nextSeq++; // Increment sequence number
-                store.insert(orderResult.order);
-                return true;
-            }
-            
-            else if (orderResult.outcome.outcomeType == OutcomeType::Bug) {
-                out += "BUG\n";
-                return false; // Stop processing on Bug
-            }
-
-            store.insert(orderResult.order);
-            out += "ACCEPT request=New clOrdId=" + std::to_string(requestOpt->clOrdId) + " orderId=" + std::to_string(orderResult.order.getOrderId()) + "\n";
-            nextOrderId++;
-            nextSeq++;
-            MatchResult matchResult = match(orderResult.order.getOrderId(), book, store, nextTradeId);
-            if (matchResult.trades.size() > 0) {
-                for (const auto& trade : matchResult.trades) {
-                    out += "TRADE tradeId=" + std::to_string(trade.tradeId) + " aggressor=" + std::to_string(store.find(trade.aggressorId)->getClOrdId()) +
-                           " resting=" + std::to_string(store.find(trade.restingId)->getClOrdId()) + " px=" + std::to_string(trade.price) +
-                           " qty=" + std::to_string(trade.qty) + "\n";
-                    const Order* restingOrder = store.find(trade.restingId);
-                    out += "STATE clOrdId=" + std::to_string(restingOrder->getClOrdId()) + " state=" + std::string(to_string(restingOrder->getState())) +
-                           " filled=" + std::to_string(restingOrder->getFilled()) + " remaining=" + std::to_string(restingOrder->getRemaining()) + "\n";
-                }
-            }
-            const auto& updatedOrder = store.find(orderResult.order.getOrderId());
-            out += "STATE clOrdId=" + std::to_string(updatedOrder->getClOrdId()) + " state=" + std::string(to_string(updatedOrder->getState())) +
-                   " filled=" + std::to_string(updatedOrder->getFilled()) + " remaining=" + std::to_string(updatedOrder->getRemaining()) + "\n";
-            if (matchResult.bug.has_value()) {
-                out += "BUG\n";
-                return false; // Stop processing on Bug
-            }
-        }
-    } else if (requestOpt->type == RequestType::Cancel) {
-        // Handle CANCEL request
-        // Implement logic for CANCEL request here
-    } else if (requestOpt->type == RequestType::Replace) {
-        // Handle REPLACE request
-        // Implement logic for REPLACE request here
+    switch (request->type) {
+        case RequestType::New:     return onNew(*request, out);
+        case RequestType::Cancel:  return onCancel(*request, out);
+        case RequestType::Replace: return onReplace(*request, out);
     }
-    (void)line;
+    return true;
+}
+
+bool Engine::onNew(const Request& request, std::string& out) {
+    if (store.hasClOrdId(request.clOrdId)) {
+        appendReject(out, "New", request.clOrdId, RejectReason::DUPLICATE_ORDER_ID);
+        return true;  // nothing stored, no internal ID used
+    }
+
+    uint64_t orderId = nextOrderId++;  // used even if validation rejects it
+    OrderIds ids{.orderId = orderId, .clOrdId = request.clOrdId, .origClOrdId = 0, .chainId = orderId};
+    NewOrderResult result = Order::create(ids, nextSeq++, request.orderType, request.side,
+                                          request.price, request.qty);
+
+    // false = the store already has this internal ID or client ID, which the
+    // check above and the counter rule out: the maps disagree -> Bug
+    if (!store.insert(result.order)) {
+        appendBug(out, orderId);
+        return false;
+    }
+
+    // create always returns Accept; an invalid request comes back in Rejected
+    if (result.order.getState() == State::REJECTED) {
+        appendReject(out, "New", request.clOrdId, result.outcome.rejectReason.value());
+        return true;  // stays stored: its client ID now counts as used
+    }
+
+    out += "ACCEPT request=New clOrdId=" + std::to_string(request.clOrdId) +
+           " orderId=" + std::to_string(orderId) + "\n";
+    return matchAndReport(orderId, out);
+}
+
+bool Engine::onCancel(const Request& request, std::string& out) {
+    // TODO (docs/io_format.md, CANCEL): unknown -> REJECT UnknownOrder;
+    // apply(CANCEL): Reject -> REJECT with its reason, Bug -> BUG;
+    // Accept -> remove from the book if it was in it, then STATE.
+    // Helpers to reuse: appendReject, appendBug, appendState.
+    (void)request;
     (void)out;
+    return true;
+}
+
+bool Engine::onReplace(const Request& request, std::string& out) {
+    // TODO (docs/io_format.md, REPLACE): checks in the spec's order; note
+    // whether the old version is in the book BEFORE replace(); ACCEPT, STATE
+    // of old, then replaceInPlace + STATE of new (same seq) or remove old +
+    // matchAndReport(new) (fresh seq). REJECT lines for REPLACE also carry
+    // origClOrdId, so they need their own line (appendReject doesn't add it).
+    (void)request;
+    (void)out;
+    return true;
+}
+
+bool Engine::matchAndReport(uint64_t orderId, std::string& out) {
+    MatchResult result = match(orderId, book, store, nextTradeId);
+
+    for (const Trade& trade : result.trades) {
+        const Order* aggressor = store.find(trade.aggressorId);
+        const Order* resting = store.find(trade.restingId);
+        if (aggressor == nullptr || resting == nullptr) {  // a trade names an unknown order
+            appendBug(out, aggressor == nullptr ? trade.aggressorId : trade.restingId);
+            return false;
+        }
+        out += "TRADE tradeId=" + std::to_string(trade.tradeId) +
+               " aggressor=" + std::to_string(aggressor->getClOrdId()) +
+               " resting=" + std::to_string(resting->getClOrdId()) +
+               " px=" + std::to_string(trade.price) +
+               " qty=" + std::to_string(trade.qty) + "\n";
+        appendState(out, *resting);
+    }
+
+    if (result.bug.has_value()) {  // trades so far, then BUG; the order's state can't be trusted
+        appendBug(out, result.bug->orderId, result.bug->event);
+        return false;
+    }
+
+    appendState(out, *store.find(orderId));
     return true;
 }
 

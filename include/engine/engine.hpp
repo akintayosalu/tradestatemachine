@@ -53,7 +53,18 @@ private:
     uint64_t nextOrderId = 1;
     uint64_t nextSeq = 1;
     uint64_t nextTradeId = 1;
-    uint64_t lineNumber = 1;
+    uint64_t lineNumber = 0;  // incremented at the start of process: first line is 1
+
+    // One handler per request type; each returns false on a Bug.
+    bool onNew(const Request& request, std::string& out);
+    bool onCancel(const Request& request, std::string& out);
+    bool onReplace(const Request& request, std::string& out);
+
+    // Match a stored live order and write the result: for each trade, TRADE
+    // then STATE of the resting order; then STATE of `orderId`. On a Bug:
+    // the trades so far, then the BUG line, and returns false. Shared by NEW
+    // and by a REPLACE that loses priority.
+    bool matchAndReport(uint64_t orderId, std::string& out);
 };
 
 struct RunResult {
