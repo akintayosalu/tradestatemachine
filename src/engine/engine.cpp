@@ -174,6 +174,8 @@ bool Engine::process(std::string_view line, std::string& out) {
         return true; // Continue processing
     }
 
+    lineNumber++;
+
     if (requestOpt->type == RequestType::New) {
         // Handle NEW request
         if (store.hasClOrdId(requestOpt->clOrdId)) {
@@ -189,17 +191,43 @@ bool Engine::process(std::string_view line, std::string& out) {
                 nextSeq++; // Increment sequence number
                 store.insert(orderResult.order);
                 return true;
-            } else if (orderResult.outcome.outcomeType == OutcomeType::Bug) {
+            } 
+            if (orderResult.outcome.outcomeType == OutcomeType::Accept && orderResult.order.getState() == State::REJECTED) {
+                out += "REJECT request=New clOrdId=" + std::to_string(requestOpt->clOrdId) + " reason=" 
+                    + std::string(to_string(orderResult.outcome.rejectReason.value())) + "\n";
+                nextOrderId++; // Increment internal order ID even for rejected orders
+                nextSeq++; // Increment sequence number
+                store.insert(orderResult.order);
+                return true;
+            }
+            
+            else if (orderResult.outcome.outcomeType == OutcomeType::Bug) {
                 out += "BUG\n";
                 return false; // Stop processing on Bug
             }
 
             store.insert(orderResult.order);
-            out += "ACCEPT request=New clOrdId=" + std::to_string(requestOpt->clOrdId) + " orderId=" + std::to_string(orderResult.order.internalId) + "\n";
-            out += "STATE clOrdId=" + std::to_string(requestOpt->clOrdId) + " state=New filled=0 remaining=" + std::to_string(orderResult.order.qty) + "\n";
+            out += "ACCEPT request=New clOrdId=" + std::to_string(requestOpt->clOrdId) + " orderId=" + std::to_string(orderResult.order.getOrderId()) + "\n";
             nextOrderId++;
             nextSeq++;
             MatchResult matchResult = match(orderResult.order.getOrderId(), book, store, nextTradeId);
+            if (matchResult.trades.size() > 0) {
+                for (const auto& trade : matchResult.trades) {
+                    out += "TRADE tradeId=" + std::to_string(trade.tradeId) + " aggressor=" + std::to_string(store.find(trade.aggressorId)->getClOrdId()) +
+                           " resting=" + std::to_string(store.find(trade.restingId)->getClOrdId()) + " px=" + std::to_string(trade.price) +
+                           " qty=" + std::to_string(trade.qty) + "\n";
+                    const Order* restingOrder = store.find(trade.restingId);
+                    out += "STATE clOrdId=" + std::to_string(restingOrder->getClOrdId()) + " state=" + std::string(to_string(restingOrder->getState())) +
+                           " filled=" + std::to_string(restingOrder->getFilled()) + " remaining=" + std::to_string(restingOrder->getRemaining()) + "\n";
+                }
+            }
+            const auto& updatedOrder = store.find(orderResult.order.getOrderId());
+            out += "STATE clOrdId=" + std::to_string(updatedOrder->getClOrdId()) + " state=" + std::string(to_string(updatedOrder->getState())) +
+                   " filled=" + std::to_string(updatedOrder->getFilled()) + " remaining=" + std::to_string(updatedOrder->getRemaining()) + "\n";
+            if (matchResult.bug.has_value()) {
+                out += "BUG\n";
+                return false; // Stop processing on Bug
+            }
         }
     } else if (requestOpt->type == RequestType::Cancel) {
         // Handle CANCEL request
@@ -219,9 +247,9 @@ RunResult runLog(std::string_view input) {
     std::string line {};
     std::string output {};
     while (std::getline(ss, line)){
-
-        engine.process(line, output);
-
+        if (!engine.process(line, output)) {
+            return RunResult{.output = output, .bug = true};
+        }
     }
-    return RunResult{};
+    return RunResult{output, false};
 }
