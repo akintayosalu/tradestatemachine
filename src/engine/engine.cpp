@@ -5,8 +5,13 @@
 #include <charconv>
 
 
-// PLACEHOLDERS so tests/engine_test.cpp links. Each returns a deliberately
-// wrong answer, so the engine tests fail until you implement them.
+// Parse a whole value as a number (uint64_t or int64_t). False if it isn't one:
+// empty, not a number, out of range, or trailing characters ("10x").
+template <typename T>
+static bool parseNumber(std::string_view val, T& out) {
+    auto [ptr, ec] = std::from_chars(val.data(), val.data() + val.size(), out);
+    return ec == std::errc() && ptr == val.data() + val.size();
+}
 
 std::optional<Request> handleCancel(const auto& requestInfo) {
     RequestType type = RequestType::Cancel;
@@ -17,8 +22,7 @@ std::optional<Request> handleCancel(const auto& requestInfo) {
     for (const auto& [key, val] : requestInfo) {
         if (key == "clOrdId") {
             // Convert val to uint64_t and assign to clOrdId
-            auto [ptr, ec] = std::from_chars(val.data(), val.data() + val.size(), clOrdId);
-            if (!(ec == std::errc()) || ptr != (val.data() + val.size())) {
+            if (!parseNumber(val, clOrdId)) {
                 return std::nullopt;
             }
         } else {
@@ -41,23 +45,19 @@ std::optional<Request> handleReplace(const auto& requestInfo) {
     }
     for (const auto& [key, val] : requestInfo) {
         if (key == "clOrdId") {
-            auto [ptr, ec] = std::from_chars(val.data(), val.data() + val.size(), clOrdId);
-            if (!(ec == std::errc()) || ptr != (val.data() + val.size())) {
+            if (!parseNumber(val, clOrdId)) {
                 return std::nullopt;
             }
         } else if (key == "origClOrdId") {
-            auto [ptr, ec] = std::from_chars(val.data(), val.data() + val.size(), origClOrdId);
-            if (!(ec == std::errc()) || ptr != (val.data() + val.size())) {
+            if (!parseNumber(val, origClOrdId)) {
                 return std::nullopt;
             }
         } else if (key == "px") {
-            auto [ptr, ec] = std::from_chars(val.data(), val.data() + val.size(), price);
-            if (!(ec == std::errc()) || ptr != (val.data() + val.size())) {
+            if (!parseNumber(val, price)) {
                 return std::nullopt;
             }
         } else if (key == "qty") {
-            auto [ptr, ec] = std::from_chars(val.data(), val.data() + val.size(), qty);
-            if (!(ec == std::errc()) || ptr != (val.data() + val.size())) {
+            if (!parseNumber(val, qty)) {
                 return std::nullopt;
             }
         } else {
@@ -85,8 +85,7 @@ std::optional<Request> handleNew(const auto& requestInfo) {
 
     for (const auto& [key, val] : requestInfo) {
         if (key == "clOrdId") {
-            auto [ptr, ec] = std::from_chars(val.data(), val.data() + val.size(), clOrdId);
-            if (!(ec == std::errc()) || ptr != (val.data() + val.size())) {
+            if (!parseNumber(val, clOrdId)) {
                 return std::nullopt;
             }
         } else if (key == "side") {
@@ -106,13 +105,11 @@ std::optional<Request> handleNew(const auto& requestInfo) {
                 return std::nullopt;
             }
         } else if (key == "px") {
-            auto [ptr, ec] = std::from_chars(val.data(), val.data() + val.size(), price);
-            if (!(ec == std::errc()) || ptr != (val.data() + val.size())) {
+            if (!parseNumber(val, price)) {
                 return std::nullopt;
             }
         } else if (key == "qty") {
-            auto [ptr, ec] = std::from_chars(val.data(), val.data() + val.size(), qty);
-            if (!(ec == std::errc()) || ptr != (val.data() + val.size())) {
+            if (!parseNumber(val, qty)) {
                 return std::nullopt;
             }
         } else {
