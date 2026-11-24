@@ -245,7 +245,7 @@ bool Engine::onCancel(const Request& request, std::string& out) {
         appendReject(out, "Cancel", request.clOrdId, RejectReason::UNKNOWN_ORDER);
         return true;
     }
-    Outcome res = requestedOrder->apply(Event::CANCEL, 0, false);
+    Outcome res = requestedOrder->apply(Event::CANCEL, 0, /*validReplace=*/true);  // cancels ignore it
     if (res.outcomeType == OutcomeType::Reject) {
         appendReject(out, "Cancel", request.clOrdId, res.rejectReason.value());
         return true;
@@ -254,9 +254,13 @@ bool Engine::onCancel(const Request& request, std::string& out) {
         return false;
     }
 
-    //Cancel request was accepted, remove from the book if it was in it
+    // Accepted -> it was live, and a live order is always in the book, so
+    // remove() returning false means the book and store disagree -> Bug
+    if (!book.remove(*requestedOrder)) {
+        appendBug(out, requestedOrder->getOrderId());
+        return false;
+    }
     appendState(out, *requestedOrder);
-    book.remove(*requestedOrder);
     return true;
 }
 
