@@ -240,12 +240,23 @@ bool Engine::onNew(const Request& request, std::string& out) {
 }
 
 bool Engine::onCancel(const Request& request, std::string& out) {
-    // TODO (docs/io_format.md, CANCEL): unknown -> REJECT UnknownOrder;
-    // apply(CANCEL): Reject -> REJECT with its reason, Bug -> BUG;
-    // Accept -> remove from the book if it was in it, then STATE.
-    // Helpers to reuse: appendReject, appendBug, appendState.
-    (void)request;
-    (void)out;
+    auto requestedOrder = store.findByClOrdId(request.clOrdId);
+    if (requestedOrder == nullptr) {
+        appendReject(out, "Cancel", request.clOrdId, RejectReason::UNKNOWN_ORDER);
+        return true;
+    }
+    Outcome res = requestedOrder->apply(Event::CANCEL, 0, false);
+    if (res.outcomeType == OutcomeType::Reject) {
+        appendReject(out, "Cancel", request.clOrdId, res.rejectReason.value());
+        return true;
+    } else if (res.outcomeType == OutcomeType::Bug) {
+        appendBug(out, requestedOrder->getOrderId(), Event::CANCEL);
+        return false;
+    }
+
+    //Cancel request was accepted, remove from the book if it was in it
+    appendState(out, *requestedOrder);
+    book.remove(*requestedOrder);
     return true;
 }
 
