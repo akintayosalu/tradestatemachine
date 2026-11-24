@@ -271,11 +271,10 @@ bool Engine::onCancel(const Request& request, std::string& out) {
 }
 
 bool Engine::onReplace(const Request& request, std::string& out) {
-    // TODO (docs/io_format.md, REPLACE): checks in the spec's order; note
-    // whether the old version is in the book BEFORE replace(); ACCEPT, STATE
-    // of old, then replaceInPlace + STATE of new (same seq) or remove old +
-    // matchAndReport(new) (fresh seq). REJECT lines for REPLACE also carry
-    // origClOrdId (pass request.origClOrdId to appendReject).
+    // docs/io_format.md, REPLACE. Checks in order: new client ID unused,
+    // original exists, Order::replace accepts. Then ACCEPT + STATE of the old
+    // version, and either replaceInPlace (priority kept: same seq) or remove the
+    // old version + match the new one like a NEW (priority lost: fresh seq).
     if (store.hasClOrdId(request.clOrdId)) {
         appendReject(out, "Replace", request.clOrdId, RejectReason::DUPLICATE_ORDER_ID, request.origClOrdId);
         return true;
@@ -300,7 +299,12 @@ bool Engine::onReplace(const Request& request, std::string& out) {
            " orderId=" + std::to_string(replacementOrder.getOrderId()) + "\n";
     appendState(out, *current);
     nextOrderId++;  // used even if the new version is in the book (replaceInPlace)
-    store.insert(replacementOrder);  // false = the store already has this internal ID or client ID, which the check above and the counter rule out: the maps disagree -> Bug
+    // false = the store already has this internal ID or client ID, which the
+    // check above and the counter rule out: the maps disagree -> Bug
+    if (!store.insert(replacementOrder)) {
+        appendBug(out, replacementOrder.getOrderId());
+        return false;
+    }
     auto newOrder = store.find(replacementOrder.getOrderId());
 
     if (newOrder->getSeq() == current->getSeq()) {

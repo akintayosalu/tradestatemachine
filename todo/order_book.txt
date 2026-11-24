@@ -222,7 +222,7 @@ Suggested order:
     or send them to std::cerr.
 
 Small leftovers (no test catches them):
-[ ] onReplace: check store.insert's return (false -> Bug); remove the stale
+[X] onReplace: check store.insert's return (false -> Bug); remove the stale
     TODO comment at the top of onReplace.
 
 Determinism (tests already written):
