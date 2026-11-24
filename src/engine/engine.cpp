@@ -301,14 +301,15 @@ bool Engine::onReplace(const Request& request, std::string& out) {
     appendState(out, *current);
     nextOrderId++;  // used even if the new version is in the book (replaceInPlace)
     store.insert(replacementOrder);  // false = the store already has this internal ID or client ID, which the check above and the counter rule out: the maps disagree -> Bug
+    auto newOrder = store.find(replacementOrder.getOrderId());
 
-    if (replacementOrder.getSeq() == current->getSeq()) {
+    if (newOrder->getSeq() == current->getSeq()) {
         // replaceInPlace: same seq, so the new version is in the book
-        if (!book.replaceInPlace(*current, replacementOrder)) {
+        if (!book.replaceInPlace(*current, *newOrder)) {
             appendBug(out, current->getOrderId());
             return false;
         }
-        appendState(out, replacementOrder);
+        appendState(out, *newOrder);
         return true;
     } else {
         // replace that loses priority: remove old, then match new
@@ -316,12 +317,8 @@ bool Engine::onReplace(const Request& request, std::string& out) {
             appendBug(out, current->getOrderId());
             return false;
         }
-        if (!book.add(replacementOrder)) {
-            appendBug(out, replacementOrder.getOrderId());
-            return false;
-        }
 
-        return matchAndReport(replacementOrder.getOrderId(), out);
+        return matchAndReport(newOrder->getOrderId(), out);
     }
 }
 
