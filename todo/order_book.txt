@@ -185,7 +185,8 @@ first: the tests compare output byte for byte).
 
 STATUS: engine DONE (include/engine/engine.hpp, src/engine/engine.cpp,
 tests/engine_test.cpp 22 tests, tests/data/golden_basic.{in,out});
-186/186 total, also under make test-asan. Left: main.cpp + stdout logging.
+186/186 total, also under make test-asan. main.cpp done: app runs a log
+file; two runs on the golden input are byte-identical to golden_basic.out.
 
 Suggested order:
 [X] parseRequest: split on spaces, first token = request type, then key=value
@@ -213,10 +214,10 @@ Suggested order:
     first false.
 [X] Bug paths: any book call that returns false when it can't, any Bug outcome
     -> BUG line, return false.
-[ ] src/main.cpp: read the input file named on the command line, runLog, write
+[X] src/main.cpp: read the input file named on the command line, runLog, write
     the output to stdout; if it hit a Bug, flush and std::abort().
     Usage: ./build/debug/app input.log > output.log
-[ ] Order::apply prints "The outcome of event ..." to std::cout. Once main
+[X] Order::apply prints "The outcome of event ..." to std::cout. Once main
     writes the engine output to stdout, those lines get mixed into it (and
     would break a byte-for-byte compare of the program's output). Remove them
     or send them to std::cerr.
@@ -228,7 +229,7 @@ Small leftovers (no test catches them):
 Determinism (tests already written):
 [X] Golden file: tests/data/golden_basic.in -> exactly golden_basic.out.
 [X] Run twice: a 5000-line generated log through two fresh engines -> identical.
-[ ] By hand once main exists: run the app twice on the golden input and diff.
+[X] By hand once main exists: run the app twice on the golden input and diff.
 
 4. POSSIBLE OPTIMIZATIONS (come back after benchmarks; NOT now)
 ----------------------------------------------------------------

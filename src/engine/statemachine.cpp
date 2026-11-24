@@ -141,10 +141,10 @@ Outcome Order::apply(const Event& event, uint64_t fillQuantity, bool validReplac
 
     }
     else if (outcome.outcomeType == OutcomeType::Reject){
-        std::cout << "The outcome of event " << event << " was rejected with reason " << outcome.rejectReason << std::endl;
+        std::cerr << "The outcome of event " << event << " was rejected with reason " << outcome.rejectReason << std::endl;
     }
     else if (outcome.outcomeType == OutcomeType::Bug){
-        std::cout << "The outcome of event " << event << " was a bug" << std::endl;
+        std::cerr << "The outcome of event " << event << " was a bug" << std::endl;
     }
     return outcome;
 }
