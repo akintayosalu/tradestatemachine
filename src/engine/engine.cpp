@@ -172,9 +172,15 @@ static void appendState(std::string& out, const Order& o) {
            " remaining=" + std::to_string(o.getRemaining()) + "\n";
 }
 
-static void appendReject(std::string& out, std::string_view request, uint64_t clOrdId, RejectReason reason) {
-    out += "REJECT request=" + std::string(request) + " clOrdId=" + std::to_string(clOrdId) +
-           " reason=" + std::string(to_string(reason)) + "\n";
+// REJECT request=<R> clOrdId=<id>[ origClOrdId=<id>] reason=<reason>
+// origClOrdId is written only for REPLACE (pass it there; NEW/CANCEL leave it out).
+static void appendReject(std::string& out, std::string_view request, uint64_t clOrdId, RejectReason reason,
+                         std::optional<uint64_t> origClOrdId = std::nullopt) {
+    out += "REJECT request=" + std::string(request) + " clOrdId=" + std::to_string(clOrdId);
+    if (origClOrdId.has_value()) {
+        out += " origClOrdId=" + std::to_string(*origClOrdId);
+    }
+    out += " reason=" + std::string(to_string(reason)) + "\n";
 }
 
 // BUG orderId=<id>[ event=<Event>]
@@ -269,20 +275,20 @@ bool Engine::onReplace(const Request& request, std::string& out) {
     // whether the old version is in the book BEFORE replace(); ACCEPT, STATE
     // of old, then replaceInPlace + STATE of new (same seq) or remove old +
     // matchAndReport(new) (fresh seq). REJECT lines for REPLACE also carry
-    // origClOrdId, so they need their own line (appendReject doesn't add it).
+    // origClOrdId (pass request.origClOrdId to appendReject).
     if (store.hasClOrdId(request.clOrdId)) {
-        appendReject(out, "Replace", request.clOrdId, RejectReason::DUPLICATE_ORDER_ID);
+        appendReject(out, "Replace", request.clOrdId, RejectReason::DUPLICATE_ORDER_ID, request.origClOrdId);
         return true;
     }
     if (!store.hasClOrdId(request.origClOrdId)) {
-        appendReject(out, "Replace", request.clOrdId, RejectReason::UNKNOWN_ORDER);
+        appendReject(out, "Replace", request.clOrdId, RejectReason::UNKNOWN_ORDER, request.origClOrdId);
         return true;
     }
 
     Order* current = store.findByClOrdId(request.origClOrdId);
     auto replaceResult = current->replace(nextOrderId, request.clOrdId, request.price, request.qty, nextSeq++);
     if (replaceResult.outcome.outcomeType == OutcomeType::Reject) {
-        appendReject(out, "Replace", request.clOrdId, replaceResult.outcome.rejectReason.value());
+        appendReject(out, "Replace", request.clOrdId, replaceResult.outcome.rejectReason.value(), request.origClOrdId);
         return true;
     } else if (replaceResult.outcome.outcomeType == OutcomeType::Bug) {
         appendBug(out, current->getOrderId(), Event::REPLACE);
