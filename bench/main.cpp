@@ -5,9 +5,12 @@
 //   1. check:      untimed; counts the output, proves the workload is sane and Bug-free
 //   2. throughput: one clock reading before and after; requests per second
 //   3. latency:    a clock reading around EACH request; per-request times
-// Parts 1-2 of the benchmark (workload, timing). Statistics come in part 3.
+// Then the latency samples become percentiles (stats.hpp), overall and per
+// request type, plus a look at the slowest requests.
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
+#include <numeric>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -15,6 +18,7 @@
 #include <vector>
 
 #include "engine/engine.hpp"
+#include "stats.hpp"
 #include "workload.hpp"
 
 namespace {
@@ -158,6 +162,66 @@ ClockInfo measureClock() {
     return ClockInfo{total / calls, smallestStep};
 }
 
+// ---------------------------------------------------------------------------
+// Reporting (part 3)
+// ---------------------------------------------------------------------------
+
+// The four request kinds do very different work, so they get separate
+// percentiles. Decided from the request line itself.
+enum Kind { LimitNew, MarketNew, Cancel, Replace, KindCount };
+const char* kindName[KindCount] = {"NEW limit", "NEW market", "CANCEL", "REPLACE"};
+
+Kind kindOf(std::string_view line) {
+    if (line.starts_with("CANCEL")) return Cancel;
+    if (line.starts_with("REPLACE")) return Replace;
+    return line.find("type=Market") != std::string_view::npos ? MarketNew : LimitNew;
+}
+
+// One table row: label, sample count, then the percentiles in nanoseconds.
+void printRow(const char* label, const LatencySummary& s) {
+    std::printf("  %-11s %8zu %7llu %7llu %7llu %7llu %8llu %9llu %10llu %8.0f\n", label, s.count,
+                (unsigned long long)s.min, (unsigned long long)s.p50, (unsigned long long)s.p90,
+                (unsigned long long)s.p99, (unsigned long long)s.p999, (unsigned long long)s.p9999,
+                (unsigned long long)s.max, s.mean);
+}
+
+void printLatencyReport(const std::vector<std::string>& lines, std::size_t warmup,
+                        const std::vector<uint64_t>& nanos) {
+    // Split the samples by request kind (nanos[i] belongs to lines[warmup + i]).
+    std::vector<uint64_t> byKind[KindCount];
+    for (std::size_t i = 0; i < nanos.size(); ++i) {
+        byKind[kindOf(lines[warmup + i])].push_back(nanos[i]);
+    }
+
+    std::printf("latency per request (ns):\n");
+    std::printf("  %-11s %8s %7s %7s %7s %7s %8s %9s %10s %8s\n", "", "count", "min", "p50", "p90",
+                "p99", "p99.9", "p99.99", "max", "mean");
+    printRow("all", summarize(nanos));
+    for (int k = 0; k < KindCount; ++k) printRow(kindName[k], summarize(byKind[k]));
+
+    // The tail, counted: how many requests were slower than each threshold.
+    const uint64_t thresholds[] = {10'000, 100'000, 1'000'000};
+    const char* names[] = {"10 us", "100 us", "1 ms"};
+    std::printf("slow requests:\n");
+    for (int t = 0; t < 3; ++t) {
+        std::size_t n = std::count_if(nanos.begin(), nanos.end(), [&](uint64_t ns) { return ns > thresholds[t]; });
+        std::printf("  > %-6s %7zu  (%.4f%%)\n", names[t], n, 100.0 * n / nanos.size());
+    }
+
+    // The 5 slowest, with their position in the run and the request itself.
+    std::vector<std::size_t> order(nanos.size());
+    std::iota(order.begin(), order.end(), 0);
+    std::size_t top = std::min<std::size_t>(5, order.size());
+    std::partial_sort(order.begin(), order.begin() + top, order.end(),
+                      [&](std::size_t a, std::size_t b) { return nanos[a] > nanos[b]; });
+    std::printf("slowest requests:\n");
+    for (std::size_t i = 0; i < top; ++i) {
+        std::size_t idx = order[i];
+        std::printf("  %9llu ns  request #%zu  %s\n", (unsigned long long)nanos[idx], warmup + idx + 1,
+                    lines[warmup + idx].c_str());
+    }
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -182,21 +246,13 @@ int main(int argc, char** argv) {
     if (!runCheck(lines)) return 1;
 
     double seconds = runThroughput(lines, warmup);
-    std::cout << "throughput pass:\n"
-              << "  " << measured << " requests in " << seconds * 1000.0 << " ms\n";
+    std::printf("throughput: %.0f requests/s  (%zu requests in %.1f ms, %.0f ns per request)\n",
+                measured / seconds, measured, seconds * 1000.0, seconds * 1e9 / measured);
 
     std::vector<uint64_t> nanos = runLatency(lines, warmup);
     ClockInfo clock = measureClock();
-    uint64_t total = 0, worst = 0;
-    for (uint64_t ns : nanos) {
-        total += ns;
-        worst = std::max(worst, ns);
-    }
-    // Rough numbers only, to see the timing works. Part 3 turns `nanos` into
-    // throughput and percentiles (p50 / p99 / p99.9).
-    std::cout << "latency pass (" << nanos.size() << " samples):\n"
-              << "  mean " << total / nanos.size() << " ns, max " << worst << " ns\n"
-              << "  clock: one now() call costs ~" << clock.costNanos << " ns, resolution "
-              << clock.resolutionNanos << " ns\n";
+    printLatencyReport(lines, warmup, nanos);
+    std::printf("clock: one now() call costs ~%.1f ns (each sample includes ~2 of them), "
+                "resolution %llu ns\n", clock.costNanos, (unsigned long long)clock.resolutionNanos);
     return 0;
 }

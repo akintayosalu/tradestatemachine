@@ -256,6 +256,11 @@ docs/benchmarks.md, including the ones that didn't help.
 [ ] Matcher: idsAt() copies a whole price level just to read its front ID.
     A book method returning only the front ID (or a pointer) avoids it.
 [ ] contains()-then-lookup patterns hash twice; one find() is enough.
+[ ] Hash-map rehash spikes (found by the benchmark, part 3): the slowest
+    requests (~1-9 ms) land at request #172829, #345391, #691359: each
+    about double the last. That's a std::unordered_map (store, client-ID map
+    or book handles) growing and rehashing everything at once. Fix to try:
+    reserve() capacity up front, or a map that grows incrementally.
 [ ] parseRequest: stringstream + a std::string per token/key/value = several
     allocations per input line. Split the string_view in place instead
     (find(' ') / substr on the view) and look keys up without copying.
