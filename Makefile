@@ -8,6 +8,7 @@
 #   make test FILTER=x   run only tests whose name contains "x"
 #   make test-list       list test names
 #   make test-asan       run tests with AddressSanitizer + UBSan (BUILD=asan)
+#   make bench           build and run the benchmark (always BUILD=release)
 #   make clean           remove build output
 #
 # Layout:
@@ -15,6 +16,7 @@
 #   src/**.cpp     everything else: engine code, linked into BOTH app and tests
 #   include/       headers
 #   tests/**.cpp   tests (see tests/README.md), linked into the test binary only
+#   bench/**.cpp   benchmark (see docs/benchmarks.md), linked into the bench binary only
 # ---------------------------------------------------------------------------
 
 CXX      ?= c++
@@ -23,11 +25,13 @@ BUILD    ?= debug
 SRC_DIR  := src
 INC_DIR  := include
 TEST_DIR := tests
+BENCH_DIR := bench
 OUT_DIR  := build/$(BUILD)
 OBJ_DIR  := $(OUT_DIR)/obj
 
 APP_BIN  := $(OUT_DIR)/app
 TEST_BIN := $(OUT_DIR)/test_runner
+BENCH_BIN := $(OUT_DIR)/bench
 
 # Pass extra flags without editing this file, e.g.
 #   make EXTRA_CXXFLAGS=-DSOMETHING
@@ -51,13 +55,15 @@ APP_MAIN  := $(SRC_DIR)/main.cpp
 SRCS      := $(shell find $(SRC_DIR) -name '*.cpp')
 LIB_SRCS  := $(filter-out $(APP_MAIN),$(SRCS))
 TEST_SRCS := $(shell find $(TEST_DIR) -name '*.cpp' 2>/dev/null)
+BENCH_SRCS := $(shell find $(BENCH_DIR) -name '*.cpp' 2>/dev/null)
 
 APP_MAIN_OBJ := $(APP_MAIN:%.cpp=$(OBJ_DIR)/%.o)
 LIB_OBJS     := $(LIB_SRCS:%.cpp=$(OBJ_DIR)/%.o)
 TEST_OBJS    := $(TEST_SRCS:%.cpp=$(OBJ_DIR)/%.o)
-DEPS         := $(APP_MAIN_OBJ:.o=.d) $(LIB_OBJS:.o=.d) $(TEST_OBJS:.o=.d)
+BENCH_OBJS   := $(BENCH_SRCS:%.cpp=$(OBJ_DIR)/%.o)
+DEPS         := $(APP_MAIN_OBJ:.o=.d) $(LIB_OBJS:.o=.d) $(TEST_OBJS:.o=.d) $(BENCH_OBJS:.o=.d)
 
-.PHONY: all run release test test-list test-asan clean FORCE
+.PHONY: all run release test test-list test-asan bench bench-run clean FORCE
 
 all: $(APP_BIN)
 
@@ -70,12 +76,17 @@ $(OUT_DIR)/%.objs: FORCE
 
 OBJS_FOR_app         = $(APP_MAIN_OBJ) $(LIB_OBJS)
 OBJS_FOR_test_runner = $(TEST_OBJS) $(LIB_OBJS)
+OBJS_FOR_bench       = $(BENCH_OBJS) $(LIB_OBJS)
 
 $(APP_BIN): $(APP_MAIN_OBJ) $(LIB_OBJS) $(OUT_DIR)/app.objs
 	@mkdir -p $(@D)
 	$(CXX) $(filter %.o,$^) $(LDFLAGS) -o $@
 
 $(TEST_BIN): $(TEST_OBJS) $(LIB_OBJS) $(OUT_DIR)/test_runner.objs
+	@mkdir -p $(@D)
+	$(CXX) $(filter %.o,$^) $(LDFLAGS) -o $@
+
+$(BENCH_BIN): $(BENCH_OBJS) $(LIB_OBJS) $(OUT_DIR)/bench.objs
 	@mkdir -p $(@D)
 	$(CXX) $(filter %.o,$^) $(LDFLAGS) -o $@
 
@@ -88,6 +99,11 @@ $(OBJ_DIR)/$(SRC_DIR)/%.o: $(SRC_DIR)/%.cpp
 $(OBJ_DIR)/$(TEST_DIR)/%.o: $(TEST_DIR)/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -I$(TEST_DIR) -c $< -o $@
+
+# Benchmark sources can include headers from bench/.
+$(OBJ_DIR)/$(BENCH_DIR)/%.o: $(BENCH_DIR)/%.cpp
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) -I$(BENCH_DIR) -c $< -o $@
 
 run: $(APP_BIN)
 	./$(APP_BIN)
@@ -103,6 +119,14 @@ test-list: $(TEST_BIN)
 
 test-asan:
 	$(MAKE) BUILD=asan test
+
+# Benchmarks only mean something optimized, so `make bench` always builds release.
+# Pass options through ARGS, e.g. make bench ARGS="--requests 100000"
+bench:
+	$(MAKE) BUILD=release bench-run
+
+bench-run: $(BENCH_BIN)
+	./$(BENCH_BIN) $(ARGS)
 
 clean:
 	rm -rf build
