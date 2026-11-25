@@ -266,3 +266,22 @@ docs/benchmarks.md, including the ones that didn't help.
 [ ] parseRequest: stringstream + a std::string per token/key/value = several
     allocations per input line. Split the string_view in place instead
     (find(' ') / substr on the view) and look keys up without copying.
+
+
+5. V2 FEATURES (after v1 ships; not optimizations, new capabilities)
+--------------------------------------------------------------------
+[ ] ITCH replay: replay a real exchange feed (NASDAQ TotalView-ITCH 5.0
+    sample files are public) through the engine. Needs: a binary parser
+    (big-endian, fixed-size messages by type: Add Order 'A'/'F', Order
+    Executed 'E'/'C', Cancel 'X', Delete 'D', Replace 'U'), a mapping from
+    ITCH messages to engine requests (one symbol at a time), and a check that
+    our book matches the feed's book. Gives a realistic benchmark workload
+    and a strong correctness test. Fits naturally before or alongside the
+    market-data component (its wire format can be ITCH/MoldUDP64-style).
+[ ] Engine-only benchmark: pre-parse the requests, time only the engine, to
+    separate parsing cost from matching cost.
+[ ] Self-trade prevention (design.md s.8: out of scope for v1): needs a
+    trader/account field on orders and a policy (cancel resting / incoming /
+    both).
+[ ] More order types: IOC / FOK (time-in-force), stop orders.
+[ ] Multiple symbols: one book per instrument.
