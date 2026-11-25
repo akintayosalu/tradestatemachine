@@ -140,11 +140,8 @@ Outcome Order::apply(const Event& event, uint64_t fillQuantity, bool validReplac
         }
 
     }
-    else if (outcome.outcomeType == OutcomeType::Reject){
-        std::cerr << "The outcome of event " << event << " was rejected with reason " << outcome.rejectReason << std::endl;
-    }
-    else if (outcome.outcomeType == OutcomeType::Bug){
-        std::cerr << "The outcome of event " << event << " was a bug" << std::endl;
-    }
+    // No logging here: apply is on the hot path (every fill, cancel, replace),
+    // and the caller already reports rejects (REJECT lines) and Bugs (BUG line).
+    // A log write costs microseconds, far more than the engine work itself.
     return outcome;
 }
