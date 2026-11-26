@@ -41,6 +41,7 @@ NEW clOrdId=202 side=Buy type=Limit px=10200 qty=50  ->  STATE clOrdId=201 state
   standby replay the same log and reach the same state (Project 2).
 
 Every decision and its reasoning: [docs/design.md](docs/design.md).
+New to the trading terms? See the [glossary](docs/glossary.md).
 
 ## Testing
 
@@ -81,7 +82,7 @@ make bench           # release-build benchmark
 include/engine/   headers (types, state machine, order, book, store, matching, engine)
 src/              implementation + main.cpp
 tests/            tests and golden files      bench/   benchmark
-docs/             design, I/O format, state machine, benchmarks
+docs/             design, I/O format, state machine, benchmarks, glossary
 ```
 
 ## Next
