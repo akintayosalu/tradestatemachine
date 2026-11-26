@@ -9,9 +9,9 @@
 #include <sstream>
 #include <string>
 
-#include "test_framework.hpp"
-#include "engine/engine.hpp"
-#include "engine/print.hpp"
+#include <test_framework.hpp>
+#include <engine/engine.hpp>
+#include <engine/print.hpp>
 
 // Run a log through a fresh engine; it must not hit a Bug.
 static std::string run(std::string_view input) {

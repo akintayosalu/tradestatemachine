@@ -9,9 +9,9 @@
 #include <ostream>
 #include <string_view>
 
-#include "engine/objects.hpp"
-#include "engine/statemachine.hpp"
-#include "engine/types.hpp"
+#include <engine/order.hpp>
+#include <engine/statemachine.hpp>
+#include <engine/types.hpp>
 
 std::string_view to_string(State s);
 std::string_view to_string(Event e);
@@ -35,5 +35,5 @@ std::ostream& operator<<(std::ostream& os, const Outcome& o);
 std::ostream& operator<<(std::ostream& os, const std::optional<RejectReason>& r);
 std::ostream& operator<<(std::ostream& os, const std::optional<State>& s);
 
-// Declared as a friend inside Order (objects.hpp) so it can read private fields.
+// Declared as a friend inside Order (order.hpp) so it can read private fields.
 std::ostream& operator<<(std::ostream& os, const Order& o);

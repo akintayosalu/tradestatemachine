@@ -5,10 +5,10 @@
 // Pattern: call decide, REQUIRE the outcome kind first (if it's wrong, the other
 // fields are meaningless), then CHECK the field that matters for that kind:
 //   Accept -> out.newState     Reject -> out.rejectReason     Bug -> nothing else
-#include "test_framework.hpp"
+#include <test_framework.hpp>
 
-#include "engine/print.hpp"
-#include "engine/statemachine.hpp"
+#include <engine/print.hpp>
+#include <engine/statemachine.hpp>
 
 // ---------------------------------------------------------------------------
 // (none) row: no order with this ID exists -> pass std::nullopt as the state

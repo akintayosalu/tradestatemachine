@@ -1,6 +1,6 @@
 // Sanity checks for the test framework itself. No engine code here.
 // Copy this shape for your own test files: include the header, write TEST_CASEs.
-#include "test_framework.hpp"
+#include <test_framework.hpp>
 
 #include <string>
 

@@ -6,10 +6,10 @@
 #include <optional>
 #include <vector>
 
-#include "engine/book.hpp"
-#include "engine/objects.hpp"
-#include "engine/store.hpp"
-#include "engine/types.hpp"
+#include <engine/book.hpp>
+#include <engine/order.hpp>
+#include <engine/store.hpp>
+#include <engine/types.hpp>
 
 // One fill between the incoming (aggressor) order and ONE resting order.
 // An incoming order that crosses several resting orders produces several trades.

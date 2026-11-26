@@ -1,6 +1,6 @@
 // OrderStore tests. Naming: "store: ..." so `make test FILTER=store:` runs these.
-#include "order_helpers.hpp"
-#include "engine/store.hpp"
+#include <order_helpers.hpp>
+#include <engine/store.hpp>
 
 // A limit buy with separate internal ID and client ID, so tests can tell the
 // two lookups apart.

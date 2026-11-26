@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "engine/objects.hpp"
+#include <engine/order.hpp>
 
 class OrderStore {
 public:
