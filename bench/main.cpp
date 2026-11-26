@@ -24,9 +24,9 @@
 #include <sys/sysctl.h>
 #endif
 
-#include "engine/engine.hpp"
-#include "stats.hpp"
-#include "workload.hpp"
+#include <engine/engine.hpp>
+#include <stats.hpp>
+#include <workload.hpp>
 
 namespace {
 

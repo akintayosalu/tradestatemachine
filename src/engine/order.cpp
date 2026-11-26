@@ -1,4 +1,4 @@
-#include "engine/objects.hpp"
+#include <engine/order.hpp>
 
 // The price rule, shared by new orders and replaces so the two can't drift apart.
 // Market orders ignore price (design.md section 4).
@@ -60,4 +60,52 @@ ReplaceResult Order::replace(uint64_t newOrderId, uint64_t newClOrdId, int64_t n
     else {
         return ReplaceResult{.outcome = o, .replacement = std::nullopt};  
     }
+}
+
+// Apply an event to this order: ask decide (the state machine) what happens,
+// then update state / filled / remaining to match.
+Outcome Order::apply(const Event& event, uint64_t fillQuantity, bool validReplace){
+    //build context for the event
+    Context ctx {};
+    ctx.orderType = type;
+    ctx.replaceValid = validReplace;
+    if (fillQuantity > remaining){
+        ctx.fillLevel = FillLevel::Over;
+    } else if (fillQuantity == remaining){
+        ctx.fillLevel = FillLevel::Exact;
+    } else {
+        ctx.fillLevel = FillLevel::Partial;
+    }
+
+    Outcome outcome = decide(state, event, ctx);
+    if (outcome.outcomeType == OutcomeType::Accept){
+        state = outcome.newState;
+        switch (state) {
+            case State::FILLED:
+                filled += fillQuantity;
+                remaining -= fillQuantity;
+                break;
+            case State::PARTIALLY_FILLED:
+                filled += fillQuantity;
+                remaining -= fillQuantity;
+                break;
+            case State::CANCELLED:
+                remaining = 0;
+                break;
+            case State::REJECTED:
+                remaining = 0;
+                break;
+            case State::REPLACED:
+                // Handle replacement logic here
+                remaining = 0;
+                break;
+            default:
+                break;
+        }
+
+    }
+    // No logging here: apply is on the hot path (every fill, cancel, replace),
+    // and the caller already reports rejects (REJECT lines) and Bugs (BUG line).
+    // A log write costs microseconds, far more than the engine work itself.
+    return outcome;
 }

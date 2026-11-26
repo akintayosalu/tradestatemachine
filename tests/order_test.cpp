@@ -1,7 +1,7 @@
 // Order::apply tests: multi-step scenarios on a real Order, with the invariants
 // from docs/design.md section 2 checked after every step.
 // Naming: "order: <scenario>" so `make test FILTER=order:` runs just these.
-#include "order_helpers.hpp"  // makeLimitBuy, makeMarketBuy, checkInvariants, ...
+#include <order_helpers.hpp>  // makeLimitBuy, makeMarketBuy, checkInvariants, ...
 
 TEST_CASE("order: New -> partial fill 30 of 100 -> PartiallyFilled") {
     Order o = makeLimitBuy(100);

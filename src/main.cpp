@@ -12,7 +12,7 @@
 #include <sstream>
 #include <string>
 
-#include "engine/engine.hpp"
+#include <engine/engine.hpp>
 
 int main(int argc, char** argv) {
     if (argc != 2) {
