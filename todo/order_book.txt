@@ -231,6 +231,44 @@ Determinism (tests already written):
 [X] Run twice: a 5000-line generated log through two fresh engines -> identical.
 [X] By hand once main exists: run the app twice on the golden input and diff.
 
+3b. MARKET DATA (L3), the last piece of v1
+------------------------------------------
+Decisions: docs/design.md section 10. Exact format: docs/io_format.md
+"Market data" (read it first: the tests compare byte for byte).
+
+STATUS: interface + tests written (Engine::process(line, out, marketData),
+RunResult::marketData, tests/marketdata_test.cpp 14 tests,
+tests/data/golden_basic.md). The engine publishes nothing yet.
+Run: make test FILTER=md:
+
+Already in place (boilerplate):
+  - process(line, out, md) points the member `marketData` at md for the
+    call; the 2-argument process publishes into a scratch buffer.
+  - nextMdSeq (from 1). Remove the (void)nextMdSeq placeholder line.
+  - runLog collects the market data into RunResult::marketData.
+
+To do:
+[ ] Helpers, one per line kind (like appendState), each using
+    seq=nextMdSeq++ and appending to *marketData: ADD (an Order),
+    EXEC (a Trade: restingId, qty, price, tradeId), MODIFY (old ID + new
+    Order), DELETE (an ID).
+[ ] matchAndReport: an EXEC per trade, in trade order; then, if the incoming
+    order is now resting (book.contains), ADD with its REMAINING quantity.
+    (Covers NEW and a REPLACE that lost priority.)
+[ ] onCancel: DELETE after the order leaves the book.
+[ ] onReplace: priority kept -> MODIFY (old ID -> new ID, new remaining);
+    priority lost -> DELETE of the old version BEFORE matching the new one.
+[ ] Nothing for rejects / malformed / blank lines (should already hold).
+[ ] main.cpp: an optional second argument for the market-data file, e.g.
+    ./build/debug/app input.log md.log > reports.log
+[ ] README: one line under "What it does" (execution reports + an L3
+    market-data feed); docs/glossary.md already has L2 / L3.
+[ ] make bench, and add a row to the history table in docs/benchmarks.md
+    (publishing costs a little per request; record it honestly).
+
+When all of this is ticked, Project 1 v1 is complete.
+
+
 4. POSSIBLE OPTIMIZATIONS (come back after benchmarks; NOT now)
 ----------------------------------------------------------------
 Rule: change one thing at a time, keep every test green, and measure before

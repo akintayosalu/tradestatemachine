@@ -329,3 +329,35 @@ Decisions made before coding the engine. The exact text formats are in
     Catches wrong output.
   - Run twice: a large generated log through two fresh engines must give
     byte-identical output. Catches nondeterminism.
+
+## 10. Market data (L3)
+
+Decisions made before coding the market-data output. Exact format:
+`docs/io_format.md`, "Market data".
+
+- **L3 (market by order), not L2.** Every resting order is published as its
+  own (anonymous) entry: add, execute, modify, delete.
+  - Each event maps onto a book change the engine already makes, so nothing
+    has to be computed or diffed.
+  - L2 (totals per price) can always be rebuilt from L3, not the reverse.
+  - It is the model NASDAQ ITCH uses, which v2 (ITCH replay) and Component 3
+    (the feed) build on.
+- **A separate stream from the execution reports.** Execution reports are
+  private (to each order's owner); market data is public. `runLog` returns
+  both; the program writes them to separate files.
+- **Anonymous: internal order IDs only.** Never client IDs.
+- **Published quantity = the order's remaining (visible) quantity.**
+- **Market data has its own sequence number** (`seq`, from 1, +1 per line,
+  owned by the engine). The feed in Component 3 detects gaps with it, and
+  because the engine is deterministic, a standby replaying the log produces
+  the same `seq` values: that is how sequence numbers stay continuous across a
+  failover.
+- **Only the book is published.** Rejects, market orders that don't trade and
+  malformed lines produce no market data. A market order shows up only as
+  EXECs on the resting orders it hit; an aggressor's own fills are implied.
+- **A full execution implies removal** (as in ITCH): an order whose EXEC
+  takes its last quantity has no DELETE.
+- **Replace, as two cases** (mirrors design.md section 3):
+  - priority kept -> MODIFY (old ID -> new ID, new quantity, same place);
+  - priority lost -> DELETE the old order, then the new version goes through
+    matching like a NEW (EXECs, then ADD if any quantity is left).

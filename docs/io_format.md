@@ -97,3 +97,38 @@ lines are processed. The program writes everything out, then calls `std::abort()
 - **Trade IDs**: from 1, one per trade (owned by the engine, passed to `match`).
 - **Seq**: any strictly increasing counter (one per NEW, one fresh per REPLACE).
   Not printed, so only its order matters.
+
+## Market data (L3): a second output stream
+
+Public, anonymous book changes (decisions: `docs/design.md` section 10). Same
+line rules as the execution reports: `KIND key=value ...`, single spaces,
+fields in exactly this order, `\n` at the end.
+
+```
+ADD seq=1 orderId=1 side=Sell px=10100 qty=30
+EXEC seq=2 orderId=1 qty=10 px=10100 tradeId=1
+MODIFY seq=3 orderId=1 newOrderId=3 qty=15
+DELETE seq=4 orderId=3
+```
+
+| Line | Meaning |
+|---|---|
+| `ADD` | a new order rests in the book; `qty` = its remaining quantity |
+| `EXEC` | a resting order traded `qty` at `px` (always its own price) in trade `tradeId`; when this uses its last quantity it leaves the book (no DELETE) |
+| `MODIFY` | a replace that kept priority: order `orderId` is now `newOrderId` with remaining `qty`, same place in the queue |
+| `DELETE` | a resting order left the book without trading: cancelled, or the old version of a replace that lost priority |
+
+`orderId` is the engine's internal ID (never a client ID). `seq` starts at 1
+and goes up by one per market-data line, across all requests.
+
+### What each request publishes, in this order
+
+- **NEW (accepted):** one `EXEC` per trade (on the resting order), then `ADD`
+  if the incoming limit order rests with quantity left. A market order or a
+  fully filled limit order publishes only its `EXEC`s.
+- **CANCEL (accepted):** `DELETE`.
+- **REPLACE (accepted):** priority kept -> `MODIFY`. Priority lost -> `DELETE`
+  of the old version, then exactly as a NEW for the new version (`EXEC`s,
+  then `ADD` if it rests).
+- **Rejects, malformed lines, blank / comment lines:** nothing.
+- **Bug:** whatever was published before the Bug, then nothing.

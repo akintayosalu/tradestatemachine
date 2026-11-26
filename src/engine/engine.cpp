@@ -197,6 +197,17 @@ static void appendBug(std::string& out, uint64_t orderId, std::optional<Event> e
 // ---------------------------------------------------------------------------
 
 bool Engine::process(std::string_view line, std::string& out) {
+    scratchMarketData.clear();  // keeps its capacity: no allocation per request
+    return process(line, out, scratchMarketData);
+}
+
+bool Engine::process(std::string_view line, std::string& out, std::string& md) {
+    marketData = &md;  // the handlers publish through this pointer
+    // TODO (market data, docs/io_format.md "Market data"): publish ADD / EXEC /
+    // MODIFY / DELETE lines from the handlers, each with seq=nextMdSeq++.
+    // Suggested: one small helper per line kind, like appendState.
+    (void)nextMdSeq;  // placeholder: remove once the helpers use it
+
     ++lineNumber;  // every line counts, including skipped and malformed ones
     if (line.empty() || line[0] == '#') {
         return true;  // blank / comment: no output
@@ -358,10 +369,11 @@ RunResult runLog(std::string_view input) {
     std::stringstream ss {std::string{input}};
     std::string line {};
     std::string output {};
+    std::string marketData {};
     while (std::getline(ss, line)){
-        if (!engine.process(line, output)) {
-            return RunResult{.output = output, .bug = true};
+        if (!engine.process(line, output, marketData)) {
+            return RunResult{.output = output, .marketData = marketData, .bug = true};
         }
     }
-    return RunResult{output, false};
+    return RunResult{.output = output, .marketData = marketData, .bug = false};
 }

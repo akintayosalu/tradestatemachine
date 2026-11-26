@@ -43,6 +43,12 @@ public:
     // the caller must stop (and, in the program, abort).
     bool process(std::string_view line, std::string& out);
 
+    // Same, and also APPEND this request's market-data lines (L3: ADD / EXEC /
+    // MODIFY / DELETE, docs/io_format.md "Market data") to `marketData`.
+    // The 2-argument version above publishes into a scratch buffer and
+    // throws it away, so both do exactly the same work.
+    bool process(std::string_view line, std::string& out, std::string& marketData);
+
 private:
     // Your data members go here (design.md section 9):
     //   - the book and the store
@@ -54,6 +60,12 @@ private:
     uint64_t nextSeq = 1;
     uint64_t nextTradeId = 1;
     uint64_t lineNumber = 0;  // incremented at the start of process: first line is 1
+
+    // Market data (design.md section 10).
+    uint64_t nextMdSeq = 1;              // seq of the next market-data line, from 1
+    std::string* marketData = nullptr;   // where this request's market data goes:
+                                         // set by process for the duration of one call
+    std::string scratchMarketData;       // the 2-argument process publishes here
 
     // One handler per request type; each returns false on a Bug.
     bool onNew(const Request& request, std::string& out);
@@ -68,7 +80,8 @@ private:
 };
 
 struct RunResult {
-    std::string output;  // everything written, in order
+    std::string output;      // execution reports, in order
+    std::string marketData;  // market-data lines (L3), in order
     bool bug = false;    // true = stopped at a Bug (output ends with the BUG line)
 };
 
